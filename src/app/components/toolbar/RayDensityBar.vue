@@ -32,9 +32,9 @@
         </button>
         <input type="range" 
           class="form-range toolbar-range" 
-          min="-3" 
-          max="3" 
-          step="0.0001" 
+          :min="RAY_DENSITY_LOG_MIN"
+          :max="RAY_DENSITY_LOG_MAX"
+          :step="RAY_DENSITY_STEP"
           v-model="rayDensity"
           @click="e => e.target.blur()"
         >
@@ -65,9 +65,9 @@
       </button>
       <input type="range" 
         class="form-range toolbar-range" 
-        min="-3" 
-        max="3" 
-        step="0.0001" 
+        :min="RAY_DENSITY_LOG_MIN"
+        :max="RAY_DENSITY_LOG_MAX"
+        :step="RAY_DENSITY_STEP"
         v-model="rayDensity"
         @click="e => e.target.blur()"
       >
@@ -90,9 +90,9 @@
       </button>
       <input type="range" 
         class="form-range toolbar-range" 
-        min="-3" 
-        max="3" 
-        step="0.0001" 
+        :min="RAY_DENSITY_LOG_MIN"
+        :max="RAY_DENSITY_LOG_MAX"
+        :step="RAY_DENSITY_STEP"
         v-model="rayDensity"
         @click="e => e.target.blur()"
       >
@@ -116,6 +116,11 @@ import { vTooltipPopover } from '../../directives/tooltip-popover'
 import { usePreferencesStore } from '../../store/preferences'
 import { useSceneStore } from '../../store/scene'
 import { computed, toRef } from 'vue'
+
+const RAY_DENSITY_LOG_MIN = -3
+const RAY_DENSITY_LOG_MAX = 3 + Math.log(4)
+const RAY_DENSITY_STEP = 0.0001
+const RAY_DENSITY_BUTTON_STEP = 0.1
 
 export default {
   name: 'RayDensityBar',
@@ -143,6 +148,7 @@ export default {
         }
       },
       set: (value) => {
+        value = Math.min(Math.max(value, RAY_DENSITY_LOG_MIN), RAY_DENSITY_LOG_MAX)
         if (mode.value === 'images' || mode.value === 'observer') {
           imageModeDensity.value = Math.exp(value)
         } else {
@@ -152,16 +158,19 @@ export default {
     })
 
     const increaseDensity = () => {
-      const newValue = rayDensity.value + 0.1
+      const newValue = Math.min(rayDensity.value + RAY_DENSITY_BUTTON_STEP, RAY_DENSITY_LOG_MAX)
       rayDensity.value = newValue
     }
 
     const decreaseDensity = () => {
-      const newValue = rayDensity.value - 0.1
+      const newValue = Math.max(rayDensity.value - RAY_DENSITY_BUTTON_STEP, RAY_DENSITY_LOG_MIN)
       rayDensity.value = newValue
     }
 
     return {
+      RAY_DENSITY_LOG_MIN,
+      RAY_DENSITY_LOG_MAX,
+      RAY_DENSITY_STEP,
       tooltipType,
       rayDensity,
       increaseDensity,

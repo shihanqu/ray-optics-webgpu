@@ -22,6 +22,7 @@ import { app } from '../services/app'
 export const STATUS_EVENT_NAMES = {
   MOUSE_POSITION: 'mousePositionChange',
   SIMULATOR_STATUS: 'simulatorStatusChange',
+  BENCHMARK_STATUS: 'benchmarkStatusChange',
   SYSTEM_STATUS: 'systemStatusChange',
   DEVICE_CHANGE: 'deviceChange',
   RESET_VIRTUAL_KEYS: 'resetVirtualKeys'
@@ -68,6 +69,17 @@ export function useStatus() {
     timeElapsed: 0,
     isSimulatorRunning: false,
     isForceStop: false
+  })
+
+  const benchmarkStatus = ref({
+    rayCount: 0,
+    totalFrameMs: 0,
+    simulationFps: 0,
+    rafFps: 0,
+    raysPerMs: 0,
+    backend: 'none',
+    phases: {},
+    fallbackReasons: []
   })
   
   // System status state
@@ -165,6 +177,10 @@ export function useStatus() {
     simulatorStatus.value = { ...simulatorStatus.value, ...status }
   })
 
+  statusEmitter.on(STATUS_EVENT_NAMES.BENCHMARK_STATUS, (status) => {
+    benchmarkStatus.value = { ...benchmarkStatus.value, ...status }
+  })
+
   statusEmitter.on(STATUS_EVENT_NAMES.SYSTEM_STATUS, (status) => {
     systemStatus.value = status
   })
@@ -173,6 +189,7 @@ export function useStatus() {
     // State
     mousePosition,
     simulatorStatus,
+    benchmarkStatus,
     systemStatus,
     // Computed
     formattedMousePosition,

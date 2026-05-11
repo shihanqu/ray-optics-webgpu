@@ -25,17 +25,17 @@ export function mapURL(url) {
     "/modules/modules": rootURL + (localeData.modules ? route : '') + '/modules/modules.html',
     "/about": rootURL + (localeData.about ? route : '') + '/about',
     "/email": "mailto:ray-optics@phydemo.app",
-    "/github": "https://github.com/ricktu288/ray-optics",
-    "/github/issues": "https://github.com/ricktu288/ray-optics/issues",
-    "/github/discussions": "https://github.com/ricktu288/ray-optics/discussions",
-    "/run-locally": "https://github.com/ricktu288/ray-optics/blob/master/run-locally/README.md",
-    "/integrations": "https://github.com/ricktu288/ray-optics/tree/dist-integrations",
-    "/contributing": "https://github.com/ricktu288/ray-optics/blob/master/CONTRIBUTING.md",
-    "/contributing/gallery": "https://github.com/ricktu288/ray-optics/blob/master/CONTRIBUTING.md#contributing-items-to-the-gallery",
-    "/contributing/modules": "https://github.com/ricktu288/ray-optics/blob/master/CONTRIBUTING.md#contributing-modules",
+    "/github": "https://github.com/shihanqu/ray-optics",
+    "/github/issues": "https://github.com/shihanqu/ray-optics/issues",
+    "/github/discussions": "https://github.com/shihanqu/ray-optics/discussions",
+    "/run-locally": "https://github.com/shihanqu/ray-optics/blob/master/run-locally/README.md",
+    "/integrations": "https://github.com/shihanqu/ray-optics/tree/dist-integrations",
+    "/contributing": "https://github.com/shihanqu/ray-optics/blob/master/CONTRIBUTING.md",
+    "/contributing/gallery": "https://github.com/shihanqu/ray-optics/blob/master/CONTRIBUTING.md#contributing-items-to-the-gallery",
+    "/contributing/modules": "https://github.com/shihanqu/ray-optics/blob/master/CONTRIBUTING.md#contributing-modules",
     "/weblate": "https://hosted.weblate.org/engage/ray-optics-simulation/",
     "/ai-tools/chatgpt": "https://chatgpt.com/g/g-6777588b53708191b66722e353e95125-ray-optics-coder",
-    "/ai-tools/instructions": "https://github.com/ricktu288/ray-optics/blob/master/ai-tools",
+    "/ai-tools/instructions": "https://github.com/shihanqu/ray-optics/blob/master/ai-tools",
     "/mathjs/syntax": "https://mathjs.org/docs/expressions/syntax.html"
   };
   return urlMap[url] || url;
@@ -44,6 +44,9 @@ export function mapURL(url) {
 // Parse the markdown-like links in the text with mapURL and return the HTML.
 export function parseLinks(text) {
   return text.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, function (match, text, url) {
+    if (url === '/gallery') {
+      return `<button type="button" data-bs-toggle="modal" data-bs-target="#galleryModal" class="inline-link-button">${text}</button>`;
+    }
     if (text === 'ray-optics@phydemo.app') {
       // Prevent link from wrapping.
       return `<a href="${mapURL(url)}" target="_blank" style="white-space: nowrap;">${text}</a>`;

@@ -25,6 +25,7 @@
   <Footer />
   <ModuleModal />
   <SaveModal />
+  <GalleryModal />
   <ImportShapesModal />
   <ColorModeModal />
   <ThemeModal />
@@ -49,6 +50,7 @@ import SimulatorControls from './SimulatorControls.vue';
 import Footer from './Footer.vue';
 import ModuleModal from './ModuleModal.vue';
 import SaveModal from './SaveModal.vue';
+import GalleryModal from './GalleryModal.vue';
 import ImportShapesModal from './ImportShapesModal.vue';
 import ColorModeModal from './ColorModeModal.vue';
 import ThemeModal from './ThemeModal.vue';
@@ -67,6 +69,7 @@ export default {
     Footer,
     ModuleModal,
     SaveModal,
+    GalleryModal,
     ImportShapesModal,
     ColorModeModal,
     ThemeModal,
@@ -109,6 +112,16 @@ export default {
 
 .property-list-items .beta-label-sup {
   color: rgba(255, 255, 255, 0.5);
+}
+
+.inline-link-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #1b77ff;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 #main-flex-wrapper {
@@ -247,6 +260,10 @@ a.btn-link:focus-visible {
 }
 
 #welcome_instruction a:hover {
+  color: #3685f9 !important;
+}
+
+#welcome_instruction .inline-link-button:hover {
   color: #3685f9 !important;
 }
 

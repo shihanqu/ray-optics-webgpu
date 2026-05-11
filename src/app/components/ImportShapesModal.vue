@@ -223,6 +223,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import * as bootstrap from 'bootstrap'
 import { app } from '../services/app.js'
+import { appEvents } from '../services/appEvents.js'
 import { pathToSvgPathD } from '../utils/svgImport.js'
 import { collectShapeColors } from '../utils/shapeImport.js'
 import { useSceneStore } from '../store/scene.js'
@@ -460,9 +461,10 @@ export default {
       reset()
     }
 
-    const onImportShapesOpen = (e) => {
-      const detail = e && e.detail ? e.detail : {}
-      applyParseResult(detail.result, detail.fileName)
+    let stopImportShapesOpen = null
+
+    const onImportShapesOpen = ({ result, fileName }) => {
+      applyParseResult(result, fileName)
       const modalEl = document.getElementById('importShapesModal')
       const instance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl)
       instance.show()
@@ -472,11 +474,12 @@ export default {
       const modal = document.getElementById('importShapesModal')
       modal.addEventListener('show.bs.modal', () => { isModalOpen.value = true })
       modal.addEventListener('hide.bs.modal', () => { isModalOpen.value = false })
-      document.addEventListener('importShapes:open', onImportShapesOpen)
+      stopImportShapesOpen = appEvents.onImportShapesOpen(onImportShapesOpen)
     })
 
     onBeforeUnmount(() => {
-      document.removeEventListener('importShapes:open', onImportShapesOpen)
+      stopImportShapesOpen?.()
+      stopImportShapesOpen = null
     })
 
     return {

@@ -74,6 +74,7 @@ import { usePreferencesStore } from '../../store/preferences'
 import { useSceneStore } from '../../store/scene'
 import { computed, toRef } from 'vue'
 import { app } from '../../services/app.js'
+import { appEvents } from '../../services/appEvents'
 import { promptNewModuleName } from '../../utils/promptNewModuleName.js'
 
 export default {
@@ -106,9 +107,7 @@ export default {
       if (newName == null) return
       app.hideWelcome()
       app.resetDropdownButtons?.()
-      document.dispatchEvent(
-        new CustomEvent('openVisualCreateModule', { detail: { moduleName: newName } })
-      )
+      appEvents.emitOpenVisualCreateModule({ moduleName: newName })
     }
 
     // Handle module selection

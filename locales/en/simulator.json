@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Welcome to Ray Optics Simulation",
-    "instruction": "To add an optical component, select a tool and click the blank space.\nTo load an example, please [go to the Gallery page](/gallery).",
+    "instruction": "To add an optical component, select a tool and click the blank space.\nTo load a built-in demo, open the Demo Gallery from the File menu.",
     "loading": "Loading scene from URL… Please wait."
   },
   "common": {
@@ -44,8 +44,8 @@
       "description": "Copy and go to the direct URL for the current scene, which can be used for sharing (possibly via a URL shortener). Also see Settings -> Auto sync URL."
     },
     "viewGallery": {
-      "title": "View Gallery",
-      "description": "Go to the Gallery webpage to load an example."
+      "title": "Demo Gallery…",
+      "description": "Open a built-in demo scene."
     }
   },
   "settings": {
@@ -123,6 +123,14 @@
     "showSimulatorControls": {
       "title": "Show simulator controls",
       "description": "Allows manual control of the simulator, useful when the scene takes a long time to run, is slow to load from JSON, or contains randomization."
+    },
+    "useWebGpuAndWasm": {
+      "title": "Use WebGPU and WASM",
+      "description": "Use the accelerated WebGPU/WASM ray path. Turn this off to use the original CPU/Canvas ray calculation path."
+    },
+    "benchmarkMode": {
+      "title": "Benchmark mode",
+      "description": "Continuously redraw the simulation and show backend, timing, FPS, rays per millisecond, rolling stats, and acceleration fallback warnings."
     },
     "showHelpPopups": {
       "title": "Show help popups",
@@ -479,10 +487,19 @@
     "description": {
       "autoSync": "You may use Settings -> Auto sync URL instead of saving to a file.",
       "rename": "Click \"Rename\" to change the title without saving to a file.",
-      "contribute": "You may consider [contributing a new item](/contributing/gallery) to the [Gallery](/gallery)."
+      "contribute": "You may consider [contributing a new built-in demo](/contributing/gallery)."
     },
     "fileName": "Name",
     "rename": "Rename"
+  },
+  "galleryModal": {
+    "title": "Demo Gallery",
+    "searchPlaceholder": "Search demos",
+    "categories": "Categories",
+    "all": "All",
+    "count": "{{shown}} of {{total}}",
+    "empty": "No demos match this search.",
+    "loadError": "The built-in demo \"{{id}}\" is not available."
   },
   "importShapesModal": {
     "title": "Import shapes",

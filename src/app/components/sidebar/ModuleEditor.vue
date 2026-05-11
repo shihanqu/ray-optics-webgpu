@@ -228,6 +228,7 @@ import { parseLinks } from '../../utils/links.js'
 import * as math from 'mathjs'
 import { useSceneStore } from '../../store/scene'
 import { app } from '../../services/app'
+import { appEvents } from '../../services/appEvents'
 import SidebarItemList from './SidebarItemList.vue'
 import InfoPopoverIcon from '../InfoPopoverIcon.vue'
 import ObjTemplateListItemContent from './ObjTemplateListItemContent.vue'
@@ -1551,8 +1552,10 @@ export default {
       maxLoopLengthCommittedSnapshot.value = maxLoopLengthInput.value
     }
 
+    let unsubscribeClearVisualEditorSelection = null
+
     onMounted(() => {
-      document.addEventListener('clearVisualEditorSelection', onClearVisualSelection)
+      unsubscribeClearVisualEditorSelection = appEvents.onClearVisualEditorSelection(onClearVisualSelection)
       document.addEventListener('sceneObjSelectionChanged', onEditorSelectionChange)
       document.addEventListener('sceneChanged', onSceneChanged)
       document.addEventListener('sceneObjsChanged', onSceneChanged)
@@ -1564,7 +1567,7 @@ export default {
       applyModuleHighlights([])
       applyModuleParamHighlight(null)
       applyModulePointHighlight(null)
-      document.removeEventListener('clearVisualEditorSelection', onClearVisualSelection)
+      unsubscribeClearVisualEditorSelection?.()
       document.removeEventListener('sceneObjSelectionChanged', onEditorSelectionChange)
       document.removeEventListener('sceneChanged', onSceneChanged)
       document.removeEventListener('sceneObjsChanged', onSceneChanged)
@@ -1843,5 +1846,4 @@ export default {
   border-color: rgba(120, 198, 255, 0.6);
 }
 </style>
-
 

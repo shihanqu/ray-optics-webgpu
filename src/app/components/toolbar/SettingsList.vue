@@ -185,6 +185,20 @@
   />
 
   <ToggleControl
+    :label="$t('simulator:settings.useWebGpuAndWasm.title')"
+    :popoverContent="$t('simulator:settings.useWebGpuAndWasm.description')"
+    v-model="useWebGpuAndWasm"
+    :layout="layout"
+  />
+
+  <ToggleControl
+    :label="$t('simulator:settings.benchmarkMode.title')"
+    :popoverContent="$t('simulator:settings.benchmarkMode.description')"
+    v-model="benchmarkMode"
+    :layout="layout"
+  />
+
+  <ToggleControl
     v-if="layout === 'desktop'"
     id="show_help_popups"
     :label="$t('simulator:settings.showHelpPopups.title')"
@@ -313,6 +327,8 @@ export default {
       showSidebar: preferences.showSidebar,
       showStatus: preferences.showStatus,
       showSimulatorControls: preferences.showSimulatorControls,
+      useWebGpuAndWasm: preferences.useWebGpuAndWasm,
+      benchmarkMode: preferences.benchmarkMode,
       help: preferences.help,
       lang,
       localeData,

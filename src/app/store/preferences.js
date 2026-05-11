@@ -26,6 +26,8 @@ const PREFERENCES_DEFAULTS = {
   sidebarWidth: 400,
   showStatus: false,
   showSimulatorControls: false,
+  useWebGpuAndWasm: true,
+  benchmarkMode: false,
   help: true,
 }
 
@@ -49,6 +51,12 @@ const PREFERENCES_CALLBACKS = {
       // Clean up JSON editor
       jsonEditorService.cleanup()
     }
+  },
+  useWebGpuAndWasm: (value) => {
+    app.setUseWebGpuAndWasm?.(value)
+  },
+  benchmarkMode: (value) => {
+    app.setBenchmarkMode?.(value)
   }
 }
 

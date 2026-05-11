@@ -54,6 +54,30 @@
       <div v-html="formattedMousePosition"></div>
       <div v-html="formattedSimulatorStatus.join('<br>')"></div>
     </div>
+    <div id="benchmark-status" v-show="benchmarkMode" :style="statusStyle">
+      <div class="benchmark-status__row">
+        <span v-for="metric in benchmarkSummaryMetrics" :key="metric.label" class="benchmark-status__metric" :style="benchmarkMetricStyle(metric)">
+          <span class="benchmark-status__label">{{ metric.label }}</span>
+          <span class="benchmark-status__value">{{ metric.value }}</span>
+        </span>
+      </div>
+      <div class="benchmark-status__row">
+        <span v-for="metric in benchmarkPhaseMetrics" :key="metric.label" class="benchmark-status__metric" :style="benchmarkMetricStyle(metric)">
+          <span class="benchmark-status__label">{{ metric.label }}</span>
+          <span class="benchmark-status__value">{{ metric.value }}</span>
+        </span>
+      </div>
+      <div class="benchmark-status__row">
+        <span v-for="metric in benchmarkRollingMetrics" :key="metric.label" class="benchmark-status__metric" :style="benchmarkMetricStyle(metric)">
+          <span class="benchmark-status__label">{{ metric.label }}</span>
+          <span class="benchmark-status__value">{{ metric.value }}</span>
+        </span>
+      </div>
+      <div v-if="benchmarkFallbackWarnings.length > 0" class="benchmark-status__warnings">
+        <span class="benchmark-status__label">Fast path note</span>
+        <span class="benchmark-status__value">{{ benchmarkFallbackWarnings.join('; ') }}</span>
+      </div>
+    </div>
     <div id="warning" class="status-alert" v-show="warnings.length > 0" @click="onJsonToggleClick"><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="status-alert__lead-icon bi bi-exclamation-triangle-fill" viewBox="0 0 16 20">
         <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
       </svg><span class="status-alert__message">
@@ -126,6 +150,14 @@ export default {
     const status = useStatus()
     const showSidebar = toRef(preferences, 'showSidebar')
     const sidebarWidth = toRef(preferences, 'sidebarWidth')
+    const benchmarkMode = toRef(preferences, 'benchmarkMode')
+    const benchmarkSamples = ref([])
+    const benchmarkSampleBackend = ref(null)
+    const BENCHMARK_SAMPLE_LIMIT = 60
+    const BENCHMARK_DISPLAY_INTERVAL_MS = 200
+    const displayedBenchmarkStatus = ref(status.benchmarkStatus.value)
+    const benchmarkDisplaySamples = []
+    let benchmarkDisplayTimer = null
     
     const notificationStyle = computed(() => ({
       left: showSidebar.value ? `${sidebarWidth.value}px` : '0px'
@@ -156,6 +188,238 @@ export default {
     const handleForceStop = () => {
       app.simulator.stopSimulation()
     }
+
+    const formatNumber = (value, maximumFractionDigits = 0) => {
+      if (!Number.isFinite(value)) {
+        return '-'
+      }
+      return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value)
+    }
+
+    const formatMs = (value, maximumFractionDigits = 2) => {
+      if (!Number.isFinite(value)) {
+        return '-'
+      }
+      return `${formatNumber(value, maximumFractionDigits)} ms`
+    }
+
+    const percentile = (sortedValues, fraction) => {
+      if (!sortedValues.length) {
+        return NaN
+      }
+      const index = Math.min(sortedValues.length - 1, Math.max(0, Math.ceil(sortedValues.length * fraction) - 1))
+      return sortedValues[index]
+    }
+
+    const averageOf = (samples, readValue) => {
+      let sum = 0
+      let count = 0
+      for (const sample of samples) {
+        const value = Number(readValue(sample))
+        if (Number.isFinite(value)) {
+          sum += value
+          count += 1
+        }
+      }
+      return count > 0 ? sum / count : NaN
+    }
+
+    const averageOrLatest = (averageValue, latestValue) => (
+      Number.isFinite(averageValue) ? averageValue : latestValue
+    )
+
+    const buildAveragedBenchmarkStatus = (samples) => {
+      const latest = samples[samples.length - 1] || status.benchmarkStatus.value || {}
+      const avgTotalFrameMs = averageOf(samples, sample => sample.totalFrameMs)
+      const avgRafFrameMs = averageOf(samples, sample => sample.rafFrameMs)
+      const avgRaysPerMs = averageOf(samples, sample => sample.raysPerMs)
+      const avgRayCount = averageOf(samples, sample => sample.rayCount)
+      const phaseKeys = [
+        'totalFrameMs',
+        'rayGenerationMs',
+        'rayProcessingMs',
+        'webGpuComputeMs',
+        'wasmTraceMs',
+        'segmentBufferMs',
+        'webGpuRenderMs',
+        'statsReadbackMs',
+        'redrawMs',
+        'validationMs',
+        'uiStatusMs'
+      ]
+      const phases = { ...(latest.phases || {}) }
+      for (const key of phaseKeys) {
+        phases[key] = averageOrLatest(
+          averageOf(samples, sample => sample.phases?.[key]),
+          phases[key]
+        )
+      }
+
+      const totalFrameMs = averageOrLatest(avgTotalFrameMs, latest.totalFrameMs)
+      const rafFrameMs = averageOrLatest(avgRafFrameMs, latest.rafFrameMs)
+      return {
+        ...latest,
+        rayCount: averageOrLatest(avgRayCount, latest.rayCount),
+        totalFrameMs,
+        simulationFps: totalFrameMs > 0 ? 1000 / totalFrameMs : latest.simulationFps,
+        rafFrameMs,
+        rafFps: rafFrameMs > 0 ? 1000 / rafFrameMs : latest.rafFps,
+        raysPerMs: averageOrLatest(avgRaysPerMs, latest.raysPerMs),
+        phases,
+        displayWindowMs: BENCHMARK_DISPLAY_INTERVAL_MS,
+        displaySampleCount: samples.length
+      }
+    }
+
+    const clearBenchmarkDisplayTimer = () => {
+      if (benchmarkDisplayTimer !== null) {
+        clearTimeout(benchmarkDisplayTimer)
+        benchmarkDisplayTimer = null
+      }
+    }
+
+    const publishBenchmarkDisplayWindow = () => {
+      benchmarkDisplayTimer = null
+      if (benchmarkDisplaySamples.length === 0) {
+        return
+      }
+      const samples = benchmarkDisplaySamples.splice(0, benchmarkDisplaySamples.length)
+      displayedBenchmarkStatus.value = buildAveragedBenchmarkStatus(samples)
+    }
+
+    const scheduleBenchmarkDisplayPublish = () => {
+      if (benchmarkDisplayTimer !== null) {
+        return
+      }
+      benchmarkDisplayTimer = setTimeout(publishBenchmarkDisplayWindow, BENCHMARK_DISPLAY_INTERVAL_MS)
+    }
+
+    const benchmarkMetric = (label, value, valueWidth = '10ch', valueAlign = 'right') => ({
+      label,
+      value,
+      valueWidth,
+      valueAlign
+    })
+
+    const benchmarkMetricStyle = (metric) => ({
+      '--benchmark-value-width': metric.valueWidth || '10ch',
+      '--benchmark-value-align': metric.valueAlign || 'right'
+    })
+
+    const benchmarkSummaryMetrics = computed(() => {
+      const benchmark = displayedBenchmarkStatus.value || {}
+      return [
+        benchmarkMetric('Backend', benchmark.backend || '-', '30ch', 'left'),
+        benchmarkMetric('Trace', benchmark.traceBackend || '-', '7ch', 'left'),
+        benchmarkMetric('Draw', benchmark.renderBackend || '-', '7ch', 'left'),
+        benchmarkMetric('GPU', benchmark.webgpu?.disabledByPreference ? 'disabled' : (benchmark.webgpu?.ready ? 'ready' : (benchmark.webgpu?.supported ? 'init' : 'off')), '8ch', 'left'),
+        benchmarkMetric('Rays', formatNumber(Number(benchmark.rayCount) || 0), '9ch'),
+        benchmarkMetric('Sim FPS', formatNumber(Number(benchmark.simulationFps), 1), '7ch'),
+        benchmarkMetric('RAF FPS', formatNumber(Number(benchmark.rafFps), 1), '7ch'),
+        benchmarkMetric('Rays/ms', formatNumber(Number(benchmark.raysPerMs), 1), '10ch')
+      ]
+    })
+
+    const benchmarkPhaseMetrics = computed(() => {
+      const phases = displayedBenchmarkStatus.value?.phases || {}
+      return [
+        benchmarkMetric('Total', formatMs(Number(phases.totalFrameMs))),
+        benchmarkMetric('Ray gen', formatMs(Number(phases.rayGenerationMs))),
+        benchmarkMetric('Ray proc', formatMs(Number(phases.rayProcessingMs))),
+        benchmarkMetric('GPU trace', formatMs(Number(phases.webGpuComputeMs))),
+        benchmarkMetric('WASM trace', formatMs(Number(phases.wasmTraceMs))),
+        benchmarkMetric('Seg buf', formatMs(Number(phases.segmentBufferMs))),
+        benchmarkMetric('WebGPU', formatMs(Number(phases.webGpuRenderMs))),
+        benchmarkMetric('Readback', formatMs(Number(phases.statsReadbackMs))),
+        benchmarkMetric('Redraw', formatMs(Number(phases.redrawMs))),
+        benchmarkMetric('Validate', formatMs(Number(phases.validationMs))),
+        benchmarkMetric('UI', formatMs(Number(phases.uiStatusMs)))
+      ]
+    })
+
+    const benchmarkRollingMetrics = computed(() => {
+      const samples = benchmarkSamples.value
+      if (samples.length === 0) {
+        return [
+          benchmarkMetric('Avg60', '-', '8ch'),
+          benchmarkMetric('P95', '-', '8ch'),
+          benchmarkMetric('Min/Max', '-', '22ch'),
+          benchmarkMetric('Avg rays/ms', '-', '10ch')
+        ]
+      }
+
+      const frameTimes = samples.map(sample => sample.totalFrameMs).sort((a, b) => a - b)
+      const avgFrame = samples.reduce((sum, sample) => sum + sample.totalFrameMs, 0) / samples.length
+      const avgRaysPerMs = samples.reduce((sum, sample) => sum + sample.raysPerMs, 0) / samples.length
+      const minFrame = frameTimes[0]
+      const maxFrame = frameTimes[frameTimes.length - 1]
+      const p95Frame = percentile(frameTimes, 0.95)
+
+      return [
+        benchmarkMetric('Avg60', formatMs(avgFrame)),
+        benchmarkMetric('P95', formatMs(p95Frame)),
+        benchmarkMetric('Min/Max', `${formatNumber(minFrame, 2)}/${formatNumber(maxFrame, 2)} ms`, '22ch'),
+        benchmarkMetric('Avg rays/ms', formatNumber(avgRaysPerMs, 1), '10ch')
+      ]
+    })
+
+    const benchmarkFallbackWarnings = computed(() => displayedBenchmarkStatus.value?.fallbackReasons || [])
+
+    watch(
+      () => benchmarkMode.value,
+      (enabled) => {
+        benchmarkDisplaySamples.length = 0
+        clearBenchmarkDisplayTimer()
+        if (enabled) {
+          benchmarkSamples.value = []
+          benchmarkSampleBackend.value = null
+          displayedBenchmarkStatus.value = status.benchmarkStatus.value || {}
+        } else {
+          displayedBenchmarkStatus.value = status.benchmarkStatus.value || {}
+        }
+      }
+    )
+
+    watch(
+      () => status.benchmarkStatus.value,
+      (benchmark) => {
+        if (!benchmarkMode.value) {
+          displayedBenchmarkStatus.value = benchmark || {}
+          return
+        }
+        if (!benchmark || benchmark.running) {
+          return
+        }
+        benchmarkDisplaySamples.push(benchmark)
+        scheduleBenchmarkDisplayPublish()
+      }
+    )
+
+    watch(
+      () => displayedBenchmarkStatus.value,
+      (benchmark) => {
+        if (!benchmarkMode.value || benchmark?.running) {
+          return
+        }
+
+        const backend = benchmark?.backend || 'none'
+        if (benchmarkSampleBackend.value !== backend) {
+          benchmarkSampleBackend.value = backend
+          benchmarkSamples.value = []
+        }
+
+        const totalFrameMs = Number(benchmark?.totalFrameMs)
+        if (!Number.isFinite(totalFrameMs) || totalFrameMs <= 0) {
+          return
+        }
+
+        const nextSamples = benchmarkSamples.value.concat({
+          totalFrameMs,
+          raysPerMs: Number(benchmark.raysPerMs) || 0
+        })
+        benchmarkSamples.value = nextSamples.slice(-BENCHMARK_SAMPLE_LIMIT)
+      }
+    )
 
     const betaPopoverContent = computed(() => {
       if (!status.activeBetaFeatures.value?.length) {
@@ -286,10 +550,17 @@ export default {
     onBeforeUnmount(() => {
       if (warningsCopiedTimer !== null) clearTimeout(warningsCopiedTimer)
       if (errorsCopiedTimer !== null) clearTimeout(errorsCopiedTimer)
+      clearBenchmarkDisplayTimer()
     })
 
     return {
       showStatus: preferences.showStatus,
+      benchmarkMode,
+      benchmarkSummaryMetrics,
+      benchmarkPhaseMetrics,
+      benchmarkRollingMetrics,
+      benchmarkMetricStyle,
+      benchmarkFallbackWarnings,
       notificationStyle,
       statusStyle,
       forceStopStyle,
@@ -377,6 +648,55 @@ export default {
   border-top-right-radius: 0.5em;
   width: fit-content;
   pointer-events: auto;
+}
+
+#benchmark-status {
+  display: block;
+  width: fit-content;
+  max-width: min(100vw, 1200px);
+  padding: 0.15rem 0.4rem;
+  box-sizing: border-box;
+  font-family: monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border-top-right-radius: 0.5em;
+  pointer-events: auto;
+}
+
+.benchmark-status__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.55rem;
+  align-items: center;
+}
+
+.benchmark-status__metric {
+  display: inline-grid;
+  grid-template-columns: max-content var(--benchmark-value-width, 10ch);
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.benchmark-status__label::after {
+  content: ":";
+}
+
+.benchmark-status__value {
+  display: inline-block;
+  min-width: var(--benchmark-value-width, 10ch);
+  overflow: hidden;
+  text-align: var(--benchmark-value-align, right);
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.benchmark-status__warnings {
+  max-width: min(100vw, 1200px);
+  overflow-wrap: anywhere;
+  color: #a15c00;
 }
 
 .status-alert {

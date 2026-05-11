@@ -17,6 +17,7 @@
 import CanvasRenderer from './CanvasRenderer.js';
 import FloatColorRenderer from './FloatColorRenderer.js';
 import geometry from './geometry.js';
+import { tryPrepareSimplePrimitiveTrace, tryProcessSimplePrimitiveTrace } from './accelerators/SimplePrimitiveTraceAccelerator.js';
 import * as C2S from 'canvas2svg';
 import * as sceneObjs from './sceneObjs.js';
 import BaseGlass from './sceneObjs/BaseGlass.js';
@@ -150,6 +151,11 @@ class Simulator {
     /** @property {number} processedRayCount - The number of rays processed in the simulation. */
     this.processedRayCount = 0;
 
+    /** @property {Object|null} benchmarkStats - Diagnostics for the most recently completed simulation run. */
+    this.benchmarkStats = null;
+    this.lastCompletedBenchmarkStats = null;
+    this._benchmarkFrame = null;
+
     /** @property {boolean} manualLightRedraw - Whether to manually redraw the light layer. True if the user turns off "Auto refresh". */
     this.manualLightRedraw = false;
 
@@ -177,6 +183,82 @@ class Simulator {
     this.canvasRendererBelowLight = null;
     this.canvasRendererAboveLight = null;
     this.canvasRendererGrid = null;
+  }
+
+  startBenchmarkFrame() {
+    const now = benchmarkNow();
+    this._benchmarkFrame = {
+      startMs: now,
+      rayGenerationMs: 0,
+      rayProcessingMs: 0,
+      redrawMs: 0,
+      validationMs: 0
+    };
+    this.benchmarkStats = {
+      ...(this.lastCompletedBenchmarkStats || {}),
+      running: true,
+      totalFrameMs: this.lastCompletedBenchmarkStats?.totalFrameMs || 0,
+      rayGenerationMs: this.lastCompletedBenchmarkStats?.rayGenerationMs || 0,
+      rayProcessingMs: this.lastCompletedBenchmarkStats?.rayProcessingMs || 0,
+      redrawMs: this.lastCompletedBenchmarkStats?.redrawMs || 0,
+      validationMs: this.lastCompletedBenchmarkStats?.validationMs || 0
+    };
+  }
+
+  addBenchmarkElapsed(name, startMs) {
+    if (!this._benchmarkFrame || !Number.isFinite(startMs)) {
+      return;
+    }
+
+    this._benchmarkFrame[name] = (this._benchmarkFrame[name] || 0) + Math.max(0, benchmarkNow() - startMs);
+  }
+
+  finishBenchmarkFrame(completion) {
+    if (!this._benchmarkFrame) {
+      return;
+    }
+
+    const now = benchmarkNow();
+    this.benchmarkStats = {
+      running: false,
+      completion,
+      rayCount: this.processedRayCount,
+      totalFrameMs: Math.max(0, now - this._benchmarkFrame.startMs),
+      rayGenerationMs: this._benchmarkFrame.rayGenerationMs || 0,
+      rayProcessingMs: this._benchmarkFrame.rayProcessingMs || 0,
+      redrawMs: this._benchmarkFrame.redrawMs || 0,
+      validationMs: this._benchmarkFrame.validationMs || 0
+    };
+    this.lastCompletedBenchmarkStats = this.benchmarkStats;
+    this._benchmarkFrame = null;
+  }
+
+  seedSimulationRays() {
+    const rayGenerationStart = benchmarkNow();
+    for (let obj of this.scene.opticalObjs) {
+      const ret = obj.onSimulationStart();
+      if (ret) {
+        if (ret.newRays) {
+          for (let newRay of ret.newRays) {
+            if (newRay && newRay.depth == null) {
+              newRay.depth = 0;
+            }
+            this.pendingRays.push(newRay);
+          }
+        }
+        if (ret.truncation) {
+          this.totalTruncation += ret.truncation;
+        }
+        if (ret.brightnessScale) {
+          if (this.brightnessScale == 0) {
+            this.brightnessScale = ret.brightnessScale;
+          } else if (this.brightnessScale != ret.brightnessScale) {
+            this.brightnessScale = -1;
+          }
+        }
+      }
+    }
+    this.addBenchmarkElapsed('rayGenerationMs', rayGenerationStart);
   }
 
   /**
@@ -374,6 +456,10 @@ class Simulator {
    * @returns {void}
    */
   updateSimulation(skipLight, skipGrid, forceRedraw) {
+    if (!skipLight) {
+      this.startBenchmarkFrame();
+    }
+
     this.emit('update', { skipLight, skipGrid, forceRedraw });
     // If the user choose to manually redraw the light layer, but the simulation update requires that the light layer be redrawn, we should mark the light layer as out of sync (in the web app the light layer will be dimmed by the app service).
     if (!skipLight && this.ctxMain?.canvas?.style) {
@@ -416,7 +502,9 @@ class Simulator {
 
     if (this.ctxBelowLight && this.ctxAboveLight) {
       this.canvasRendererBelowLight = new CanvasRenderer(this.ctxBelowLight, { x: this.scene.origin.x * this.dpr, y: this.scene.origin.y * this.dpr }, (this.scene.scale * this.dpr), this.scene.lengthScale, this.scene.backgroundImage);
-      this.canvasRendererAboveLight = new CanvasRenderer(this.ctxAboveLight, { x: this.scene.origin.x * this.dpr, y: this.scene.origin.y * this.dpr }, (this.scene.scale * this.dpr), this.scene.lengthScale);
+      if (skipLight) {
+        this.canvasRendererAboveLight = new CanvasRenderer(this.ctxAboveLight, { x: this.scene.origin.x * this.dpr, y: this.scene.origin.y * this.dpr }, (this.scene.scale * this.dpr), this.scene.lengthScale);
+      }
     }
 
     // If the scene uses non-default color mode but the WebGL context is not available, switch to the default color mode
@@ -467,6 +555,13 @@ class Simulator {
     if (!skipLight) {
       this.pendingRays = [];
       this.processedRayCount = 0;
+      this.leftRayCount = 0;
+      this.last_s_obj_index = -1;
+      this.last_ray = null;
+      this.last_intersection = null;
+      this.pendingRaysIndex = -1;
+      this.firstBreak = true;
+      this.simplePrimitiveTracePrepared = null;
     }
 
     if (!skipGrid && this.ctxGrid) {
@@ -529,39 +624,14 @@ class Simulator {
     }
 
     if (!skipLight) {
-      // Initialize the simulation (e.g. add the rays and reset the detector readings)
-      for (let obj of this.scene.opticalObjs) {
-        const ret = obj.onSimulationStart();
-        if (ret) {
-          if (ret.newRays) {
-            for (let newRay of ret.newRays) {
-              if (newRay && newRay.depth == null) {
-                newRay.depth = 0;
-              }
-              this.pendingRays.push(newRay);
-            }
-          }
-          if (ret.truncation) {
-            this.totalTruncation += ret.truncation;
-          }
-          if (ret.brightnessScale) {
-            if (this.brightnessScale == 0) {
-              this.brightnessScale = ret.brightnessScale;
-            } else if (this.brightnessScale != ret.brightnessScale) {
-              this.brightnessScale = -1;
-            }
-          }
-        }
+      // Initialize the simulation. Eligible GPU-compute primitive scenes can
+      // generate rays inside the compute shader and skip the CPU ray queue.
+      if (!tryPrepareSimplePrimitiveTrace(this)) {
+        this.seedSimulationRays();
       }
     }
 
     if (!skipLight) {
-      this.leftRayCount = 0;
-      this.last_s_obj_index = -1;
-      this.last_ray = null;
-      this.last_intersection = null;
-      this.pendingRaysIndex = -1;
-      this.firstBreak = true;
       this.processRays();
     }
 
@@ -594,6 +664,7 @@ class Simulator {
    */
   processRays() {
     this.simulationTimerId = -1;
+    const rayProcessingStart = benchmarkNow();
     var st_time = new Date();
     var alpha0 = 1;
     
@@ -624,8 +695,90 @@ class Simulator {
 
     const opticalObjs = this.scene.opticalObjs;
 
+    const finishAcceleratedRayProcessing = () => {
+      this.addBenchmarkElapsed('rayProcessingMs', rayProcessingStart);
+      const webGpuRendered =
+        this.accelerationStats?.backend === 'simple-primitive-webgpu-compute' ||
+        this.accelerationStats?.backend === 'simple-primitive-wasm-webgpu';
+      if (this.canvasRendererMain && !webGpuRendered) {
+        if (this.scene.simulateColors && !this.isSVG) {
+          this.canvasRendererMain.applyColorTransformation();
+          if (this.ctxAboveLight) {
+            this.ctxAboveLight.setTransform(this.scene.scale * this.dpr, 0, 0, this.scene.scale * this.dpr, this.scene.origin.x * this.dpr, this.scene.origin.y * this.dpr);
+          }
+        }
+        if (this.scene.colorMode != 'default') {
+          this.canvasRendererMain.flush();
+        }
+        if (this.ctxMain) {
+          this.ctxMain.globalAlpha = 1.0;
+        }
+      }
+
+      const redrawStart = benchmarkNow();
+      this.updateSimulation(true, true);
+      this.addBenchmarkElapsed('redrawMs', redrawStart);
+
+      const validationStart = benchmarkNow();
+      this.validate();
+      this.addBenchmarkElapsed('validationMs', validationStart);
+
+      if (this.shouldSimulatorStop) {
+        this.finishBenchmarkFrame('stopped');
+        this.emit('simulationStop', null);
+        this.shouldSimulatorStop = false;
+      } else {
+        this.finishBenchmarkFrame('complete');
+        this.emit('simulationComplete', null);
+      }
+    };
+
+    const acceleratedResult = tryProcessSimplePrimitiveTrace(this);
+    if (acceleratedResult) {
+      if (acceleratedResult.pending) {
+        this.simulationTimerId = -2;
+        acceleratedResult.promise
+          .then(() => {
+            this.simulationTimerId = -1;
+            if (this.useWebGpuAndWasm === false) {
+              return;
+            }
+            finishAcceleratedRayProcessing();
+          })
+          .catch((error) => {
+            this.simulationTimerId = -1;
+            if (this.useWebGpuAndWasm === false) {
+              return;
+            }
+            const fallbackReason = `Pure WebGPU trace rejected by validation; using WASM trace with WebGPU rendering: ${error?.message || error}`;
+            this.simplePrimitiveWebGpuComputeDisabledReason = this.simplePrimitiveWebGpuComputeDisabledReason || fallbackReason;
+            this.simplePrimitiveTracePrepareFallbackReasons = [fallbackReason];
+            this.accelerationStats = {
+              backend: 'generic-js',
+              fallbackReasons: this.simplePrimitiveTracePrepareFallbackReasons
+            };
+            this.simplePrimitiveTracePrepared = null;
+            this.pendingRays = [];
+            this.processedRayCount = 0;
+            this.leftRayCount = 0;
+            this.last_s_obj_index = -1;
+            this.last_ray = null;
+            this.last_intersection = null;
+            this.pendingRaysIndex = -1;
+            this.seedSimulationRays();
+            this.addBenchmarkElapsed('rayProcessingMs', rayProcessingStart);
+            this.processRays();
+          });
+        return;
+      }
+
+      finishAcceleratedRayProcessing();
+      return;
+    }
+
     while (true) {
       if (new Date() - st_time > 50 && this.enableTimer) {
+        this.addBenchmarkElapsed('rayProcessingMs', rayProcessingStart);
         // If already run for 50ms
         // Pause for 10ms and continue (prevent not responding)
         this.simulationTimerId = setTimeout(() => this.processRays(), this.firstBreak ? 100 : 1);
@@ -637,9 +790,13 @@ class Simulator {
 
         this.emit('simulationPause', null);
 
+        const redrawStart = benchmarkNow();
         this.updateSimulation(true, true); // Redraw the opticalObjs to avoid outdated information (e.g. detector readings).
+        this.addBenchmarkElapsed('redrawMs', redrawStart);
 
+        const validationStart = benchmarkNow();
         this.validate();
+        this.addBenchmarkElapsed('validationMs', validationStart);
         return;
       }
       if (this.processedRayCount > this.rayCountLimit) {
@@ -665,6 +822,11 @@ class Simulator {
         // Start handling this.pendingRays[j]
         // Test which object will this ray shoot on first
 
+        const lengthScaleSquared = this.scene.lengthScale * this.scene.lengthScale;
+        const minRaySegmentLengthSquared = Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * lengthScaleSquared;
+        const nearbyImageDistanceSquared = 25 * lengthScaleSquared;
+        const minObservedRayDistanceSquared = 1e-5 * lengthScaleSquared;
+
         // Search every object intersected with the ray, and find which intersection is the nearest
         s_obj = null; // The current nearest object in search
         s_obj_index = -1;
@@ -680,7 +842,7 @@ class Simulator {
           if (s_point_temp) {
             // Here opticalObjs[i] intersects with the ray at s_point_temp
             s_lensq_temp = geometry.distanceSquared(this.pendingRays[j].p1, s_point_temp);
-            if (s_point && geometry.distanceSquared(s_point_temp, s_point) < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale && (opticalObjs[i] instanceof BaseGlass || s_obj instanceof BaseGlass)) {
+            if (s_point && geometry.distanceSquared(s_point_temp, s_point) < minRaySegmentLengthSquared && (opticalObjs[i] instanceof BaseGlass || s_obj instanceof BaseGlass)) {
               // The ray is incident on two objects at the same time, and at least one of them is a glass
 
               if (s_obj instanceof BaseGlass) {
@@ -715,11 +877,11 @@ class Simulator {
                 surfaceMergingObjs[surfaceMergingObjs.length] = opticalObjs[i];
               }
             } else {
-              if (s_point && geometry.distanceSquared(s_point_temp, s_point) < Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+              if (s_point && geometry.distanceSquared(s_point_temp, s_point) < minRaySegmentLengthSquared) {
                 // the ray is incident on two objects at the same time, and none of them is a glass
                 s_undefinedBehavior = true;
                 s_undefinedBehaviorObjs = [s_obj, opticalObjs[i]];
-              } else if (s_lensq_temp < s_lensq && s_lensq_temp > Simulator.MIN_RAY_SEGMENT_LENGTH_SQUARED * this.scene.lengthScale * this.scene.lengthScale) {
+              } else if (s_lensq_temp < s_lensq && s_lensq_temp > minRaySegmentLengthSquared) {
                 s_obj = opticalObjs[i]; // Update the object to be incident on
                 s_obj_index = i;
                 s_point = s_point_temp;
@@ -812,9 +974,9 @@ class Simulator {
             observed_intersection = geometry.linesIntersection(this.pendingRays[j], this.last_ray); // The intersection of the observed rays
 
             if (observed) {
-              if (this.last_intersection && geometry.distanceSquared(this.last_intersection, observed_intersection) < 25 * this.scene.lengthScale * this.scene.lengthScale) {
+              if (this.last_intersection && geometry.distanceSquared(this.last_intersection, observed_intersection) < nearbyImageDistanceSquared) {
                 // If the intersections are near each others
-                if (geometry.intersectionIsOnRay(observed_intersection, geometry.line(observed_point, this.pendingRays[j].p1)) && geometry.distanceSquared(observed_point, this.pendingRays[j].p1) > 1e-5 * this.scene.lengthScale * this.scene.lengthScale) {
+                if (geometry.intersectionIsOnRay(observed_intersection, geometry.line(observed_point, this.pendingRays[j].p1)) && geometry.distanceSquared(observed_point, this.pendingRays[j].p1) > minObservedRayDistanceSquared) {
                   if (this.scene.simulateColors) {
                     var color = this.scene.simulator.wavelengthToColor(this.pendingRays[j].wavelength, (this.pendingRays[j].brightness_s + this.pendingRays[j].brightness_p) * 0.5, !this.isSVG && (this.scene.colorMode == 'default'));
                   } else {
@@ -878,7 +1040,7 @@ class Simulator {
         if (this.scene.mode == 'images' && this.last_ray && this.canvasRendererMain) {
           if (!this.pendingRays[j].gap) {
             observed_intersection = geometry.linesIntersection(this.pendingRays[j], this.last_ray);
-            if (this.last_intersection && geometry.distanceSquared(this.last_intersection, observed_intersection) < 25 * this.scene.lengthScale * this.scene.lengthScale) {
+            if (this.last_intersection && geometry.distanceSquared(this.last_intersection, observed_intersection) < nearbyImageDistanceSquared) {
               if (this.scene.simulateColors) {
                 var color = this.scene.simulator.wavelengthToColor(this.pendingRays[j].wavelength, (this.pendingRays[j].brightness_s + this.pendingRays[j].brightness_p) * 0.5, !this.isSVG && (this.scene.colorMode == 'default'));
               } else {
@@ -997,15 +1159,23 @@ class Simulator {
       }
     }
     
-    this.updateSimulation(true, true);
+    this.addBenchmarkElapsed('rayProcessingMs', rayProcessingStart);
 
+    const redrawStart = benchmarkNow();
+    this.updateSimulation(true, true);
+    this.addBenchmarkElapsed('redrawMs', redrawStart);
+
+    const validationStart = benchmarkNow();
     this.validate();
+    this.addBenchmarkElapsed('validationMs', validationStart);
 
     if (this.shouldSimulatorStop) {
+      this.finishBenchmarkFrame('stopped');
       this.emit('simulationStop', null);
       
       this.shouldSimulatorStop = false;
     } else {
+      this.finishBenchmarkFrame('complete');
       this.emit('simulationComplete', null);
     }
   }
@@ -1189,6 +1359,12 @@ class Simulator {
 
     return [R, G, B, 1];
   }
+}
+
+function benchmarkNow() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
 }
 
 export default Simulator;

@@ -18,6 +18,7 @@
   <canvas id="canvasGrid"></canvas>
   <canvas id="canvasBelowLight"></canvas>
   <canvas id="canvasLight" v-show="colorMode === 'default'"></canvas>
+  <canvas id="canvasLightWebGPU"></canvas>
   <canvas id="canvasLightWebGL" v-show="colorMode !== 'default'"></canvas>
   <canvas id="canvasAboveLight"></canvas>
 
@@ -69,6 +70,7 @@ export default {
       resizeCanvas(document.getElementById('canvasGrid'));
       resizeCanvas(document.getElementById('canvasBelowLight'));
       resizeCanvas(document.getElementById('canvasLight'));
+      resizeCanvas(document.getElementById('canvasLightWebGPU'));
       resizeCanvas(document.getElementById('canvasLightWebGL'));
       resizeCanvas(document.getElementById('canvasAboveLight'));
       sceneStore.setViewportSize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
@@ -116,6 +118,16 @@ export default {
 
 #canvasLightWebGL {
   background-color: transparent;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  z-index: -5;
+}
+
+#canvasLightWebGPU {
+  background-color: transparent;
+  display: none;
   position: absolute;
   width: 100%;
   height: 100%;

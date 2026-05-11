@@ -51,6 +51,16 @@ function mergeWithDefaults(target, source, defaults, path = '') {
   return result;
 }
 
+function resolveBackgroundImageSource(backgroundImage) {
+  if (
+    typeof backgroundImage === 'string' &&
+    /^(?:data:|blob:|https?:|\/|\.\/|\.\.\/)/.test(backgroundImage)
+  ) {
+    return backgroundImage;
+  }
+  return "../gallery/" + backgroundImage;
+}
+
 /**
  * Recursively validate that an object only contains known keys.
  * @param {Object} obj - The object to validate
@@ -593,7 +603,7 @@ class Scene {
       // Load the background image.
       if (jsonData.backgroundImage) {
         this.backgroundImage = new Image();
-        this.backgroundImage.src = "../gallery/" + jsonData.backgroundImage;
+        this.backgroundImage.src = resolveBackgroundImageSource(jsonData.backgroundImage);
         this.backgroundImage.onload = function (e1) {
           callback(false, true);
         }

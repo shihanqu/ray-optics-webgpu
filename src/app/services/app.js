@@ -30,6 +30,9 @@ import { jsonEditorService } from '../services/jsonEditor.js';
 import { statusEmitter, STATUS_EVENT_NAMES } from '../composables/useStatus.js';
 import { mapURL, parseLinks } from '../utils/links.js';
 import { parseShapesFile } from '../utils/svgImport.js';
+import { appEvents } from './appEvents.js';
+import { initGpuAcceleration } from './gpuAcceleration.js';
+import { getGallerySceneJSON } from './gallerySamples.js';
 import {
   prepareImportedPaths,
   buildImportedObjectSpecs,
@@ -52,12 +55,14 @@ function initAppService() {
   canvas = document.getElementById('canvasAboveLight');
   canvasBelowLight = document.getElementById('canvasBelowLight');
   canvasLight = document.getElementById('canvasLight');
+  canvasLightWebGPU = document.getElementById('canvasLightWebGPU');
   canvasLightWebGL = document.getElementById('canvasLightWebGL');
   canvasGrid = document.getElementById('canvasGrid');
 
   app.canvas = canvas;
   app.canvasBelowLight = canvasBelowLight;
   app.canvasLight = canvasLight;
+  app.canvasLightWebGPU = canvasLightWebGPU;
   app.canvasLightWebGL = canvasLightWebGL;
   app.canvasGrid = canvasGrid;
 
@@ -98,6 +103,9 @@ function initAppService() {
     }
   );
   app.simulator = simulator;
+  simulator.canvasLightWebGPU = canvasLightWebGPU;
+  simulator.useWebGpuAndWasm = webGpuAndWasmEnabled;
+  initGpuAcceleration(app, simulator);
 
   editor = new Editor(scene, canvas, simulator);
   app.editor = editor;
@@ -146,6 +154,131 @@ function initAppService() {
 
 
 
+  function buildBenchmarkDiagnostics(uiStatusElapsedMs = 0) {
+    const timeElapsed = simulator.simulationStartTime ? new Date() - simulator.simulationStartTime : 0;
+    const liveBenchmarkStats = simulator.benchmarkStats || {};
+    const benchmarkStats = liveBenchmarkStats.running && simulator.lastCompletedBenchmarkStats
+      ? simulator.lastCompletedBenchmarkStats
+      : liveBenchmarkStats;
+    const accelerationStats = simulator.accelerationStats || {};
+    const completedFrameMs = Number(benchmarkStats.totalFrameMs);
+    const hasCompletedFrameMs = Number.isFinite(completedFrameMs) && completedFrameMs > 0;
+    const totalFrameMs = hasCompletedFrameMs
+      ? completedFrameMs
+      : (!liveBenchmarkStats.running && timeElapsed > 0 ? timeElapsed : NaN);
+    const fallbackReasons = [
+      ...(accelerationStats.fallbackReasons || []),
+      ...(accelerationStats.webGpuFallbackReasons || [])
+    ].filter(Boolean);
+    const uniqueFallbackReasons = [...new Set(fallbackReasons)];
+    const useWebGpuAndWasm = simulator.useWebGpuAndWasm !== false && webGpuAndWasmEnabled !== false;
+    let backend = accelerationStats.backend || (simulator.processedRayCount > 0 ? 'generic-js' : 'none');
+    const backendParts = describeBenchmarkBackend(backend);
+    const completedRayCount = Number(benchmarkStats.rayCount) ||
+      Number(accelerationStats.processedRayCountAfter) ||
+      Number(accelerationStats.rayCount) ||
+      0;
+    const liveRayCount = Number(simulator.processedRayCount) ||
+      Number(accelerationStats.processedRayCountAfter) ||
+      Number(accelerationStats.rayCount) ||
+      completedRayCount;
+    const displayedRayCount = liveBenchmarkStats.running && completedRayCount > 0
+      ? completedRayCount
+      : liveRayCount;
+
+    if (!useWebGpuAndWasm && !uniqueFallbackReasons.includes('WebGPU/WASM disabled by setting')) {
+      uniqueFallbackReasons.push('WebGPU/WASM disabled by setting');
+    }
+
+    if (
+      useWebGpuAndWasm &&
+      backend !== 'simple-primitive-wasm-webgpu' &&
+      backend !== 'simple-primitive-webgpu-compute' &&
+      uniqueFallbackReasons.length === 0
+    ) {
+      uniqueFallbackReasons.push('WebGPU fast path not active');
+    }
+
+    return {
+      rayCount: displayedRayCount,
+      timeElapsed,
+      totalFrameMs,
+      simulationFps: totalFrameMs > 0 ? 1000 / totalFrameMs : NaN,
+      rafFrameMs: benchmarkRedrawVisualFrameMs,
+      rafFps: benchmarkRedrawVisualFrameMs > 0 ? 1000 / benchmarkRedrawVisualFrameMs : 0,
+      raysPerMs: totalFrameMs > 0 ? displayedRayCount / totalFrameMs : NaN,
+      backend,
+      traceBackend: backendParts.traceBackend,
+      renderBackend: backendParts.renderBackend,
+      completion: benchmarkStats.completion || null,
+      running: Boolean(liveBenchmarkStats.running),
+      phases: {
+        totalFrameMs,
+        rayGenerationMs: benchmarkStats.rayGenerationMs,
+        rayProcessingMs: benchmarkStats.rayProcessingMs,
+        webGpuComputeMs: accelerationStats.computeDispatchElapsedMs,
+        wasmTraceMs: accelerationStats.wasmTraceElapsedMs ?? accelerationStats.traceElapsedMs,
+        segmentBufferMs: accelerationStats.segmentBufferElapsedMs,
+        webGpuRenderMs: accelerationStats.renderElapsedMs,
+        statsReadbackMs: accelerationStats.statsReadbackElapsedMs,
+        redrawMs: benchmarkStats.redrawMs,
+        validationMs: benchmarkStats.validationMs,
+        uiStatusMs: uiStatusElapsedMs
+      },
+      accelerationStats,
+      fallbackReasons: uniqueFallbackReasons,
+      webgpu: {
+        supported: Boolean(simulator.gpuAcceleration?.webgpu?.supported),
+        ready: Boolean(simulator.gpuAcceleration?.webgpu?.ready),
+        error: simulator.gpuAcceleration?.webgpu?.error || null,
+        disabledByPreference: !useWebGpuAndWasm
+      }
+    };
+  }
+
+  function describeBenchmarkBackend(backend) {
+    switch (backend) {
+      case 'simple-primitive-webgpu-compute':
+        return { traceBackend: 'WebGPU', renderBackend: 'WebGPU' };
+      case 'simple-primitive-wasm-webgpu':
+        return { traceBackend: 'WASM', renderBackend: 'WebGPU' };
+      case 'simple-primitive-wasm':
+        return { traceBackend: 'WASM', renderBackend: 'none' };
+      case 'simple-primitive-js':
+        return { traceBackend: 'JS', renderBackend: 'Canvas' };
+      case 'generic-js':
+        return { traceBackend: 'JS', renderBackend: 'Canvas' };
+      case 'none':
+        return { traceBackend: '-', renderBackend: '-' };
+      default:
+        return { traceBackend: backend || '-', renderBackend: '-' };
+    }
+  }
+
+  function publishSimulationDiagnostics(uiStatusElapsedMs = 0) {
+    const benchmarkDiagnostics = buildBenchmarkDiagnostics(uiStatusElapsedMs);
+    const diagnostics = {
+      rayCount: simulator.processedRayCount,
+      timeElapsed: new Date() - simulator.simulationStartTime,
+      accelerationStats: simulator.accelerationStats || null,
+      benchmark: benchmarkDiagnostics,
+      webgpu: {
+        supported: Boolean(simulator.gpuAcceleration?.webgpu?.supported),
+        ready: Boolean(simulator.gpuAcceleration?.webgpu?.ready),
+        error: simulator.gpuAcceleration?.webgpu?.error || null
+      }
+    };
+    app.lastSimulationStats = diagnostics;
+    window.rayOpticsLastSimulationStats = diagnostics;
+    statusEmitter.emit(STATUS_EVENT_NAMES.BENCHMARK_STATUS, benchmarkDiagnostics);
+  }
+
+  function emitSimulatorStatus(payload) {
+    const uiStatusStart = appNow();
+    statusEmitter.emit(STATUS_EVENT_NAMES.SIMULATOR_STATUS, payload);
+    publishSimulationDiagnostics(appNow() - uiStatusStart);
+  }
+
   simulator.dpr = dpr;
 
   simulator.on('update', function () {
@@ -153,7 +286,8 @@ function initAppService() {
   });
 
   simulator.on('simulationStart', function () {
-    statusEmitter.emit(STATUS_EVENT_NAMES.SIMULATOR_STATUS, {
+    benchmarkRedrawSimulationRunning = true;
+    emitSimulatorStatus({
       rayCount: 0,
       totalTruncation: 0,
       brightnessScale: null,
@@ -164,7 +298,7 @@ function initAppService() {
   });
 
   simulator.on('simulationPause', function () {
-    statusEmitter.emit(STATUS_EVENT_NAMES.SIMULATOR_STATUS, {
+    emitSimulatorStatus({
       rayCount: simulator.processedRayCount,
       totalTruncation: simulator.totalTruncation,
       brightnessScale: simulator.brightnessScale,
@@ -175,7 +309,8 @@ function initAppService() {
   });
   
   simulator.on('simulationStop', function () {
-    statusEmitter.emit(STATUS_EVENT_NAMES.SIMULATOR_STATUS, {
+    benchmarkRedrawSimulationRunning = false;
+    emitSimulatorStatus({
       rayCount: simulator.processedRayCount,
       totalTruncation: simulator.totalTruncation,
       brightnessScale: simulator.brightnessScale,
@@ -186,7 +321,8 @@ function initAppService() {
   });
   
   simulator.on('simulationComplete', function () {
-    statusEmitter.emit(STATUS_EVENT_NAMES.SIMULATOR_STATUS, {
+    benchmarkRedrawSimulationRunning = false;
+    emitSimulatorStatus({
       rayCount: simulator.processedRayCount,
       totalTruncation: simulator.totalTruncation,
       brightnessScale: simulator.brightnessScale,
@@ -198,9 +334,11 @@ function initAppService() {
 
   simulator.on('lightLayerSyncChange', function (e) {
     if (e.isSynced) {
+      canvasLightWebGPU.style.opacity = 1;
       canvasLightWebGL.style.opacity = 1;
       canvasLight.style.opacity = 1;
     } else {
+      canvasLightWebGPU.style.opacity = 0.5;
       canvasLightWebGL.style.opacity = 0.5;
       canvasLight.style.opacity = 0.5;
     }
@@ -652,7 +790,7 @@ function initAppService() {
     document.getElementById('openfile').click();
   };
   app.viewGallery = function () {
-    window.open(mapURL('/gallery'));
+    showGalleryModal();
   };
 
 
@@ -680,9 +818,7 @@ function initAppService() {
     } catch (e) {
       result = { paths: [], viewBox: null, error: 'Failed to read file: ' + e.message };
     }
-    document.dispatchEvent(new CustomEvent('importShapes:open', {
-      detail: { result, fileName: file.name },
-    }));
+    appEvents.emitImportShapesOpen({ result, fileName: file.name });
   };
 
   app.cloneSelectedObj = function () {
@@ -823,22 +959,138 @@ function initAppService() {
     e.stopPropagation();
   });
 
+  setBenchmarkMode(benchmarkRedrawEnabled);
+
 }
 
 
 var canvas;
 var canvasBelowLight;
 var canvasLight;
+var canvasLightWebGPU;
 var canvasLightWebGL;
 var canvasGrid;
 var scene;
 var editor;
 var simulator;
+var benchmarkRedrawEnabled = false;
+var benchmarkRedrawFrameId = null;
+var benchmarkRedrawSimulationRunning = false;
+var benchmarkRedrawUpdateInProgress = false;
+var benchmarkRedrawLastFrameMs = null;
+var benchmarkRedrawVisualFrameMs = 0;
+var webGpuAndWasmEnabled = true;
 var xyBox_cancelContextMenu = false;
 var hasUnsavedChange = false;
 var warning = null;
 var error = null;
 
+
+function setUseWebGpuAndWasm(enabled) {
+  const nextEnabled = Boolean(enabled);
+  const changed = webGpuAndWasmEnabled !== nextEnabled || simulator?.useWebGpuAndWasm !== nextEnabled;
+  webGpuAndWasmEnabled = nextEnabled;
+  app.useWebGpuAndWasm = nextEnabled;
+
+  if (typeof globalThis !== 'undefined') {
+    if (nextEnabled) {
+      delete globalThis.RAY_OPTICS_DISABLE_WEBGPU_WASM;
+    } else {
+      globalThis.RAY_OPTICS_DISABLE_WEBGPU_WASM = true;
+    }
+  }
+
+  if (!simulator) {
+    return;
+  }
+
+  simulator.useWebGpuAndWasm = nextEnabled;
+  simulator.simplePrimitiveTracePrepared = null;
+  simulator.simplePrimitiveTracePrepareFallbackReasons = nextEnabled
+    ? []
+    : ['WebGPU/WASM disabled by setting'];
+  if (nextEnabled) {
+    simulator.simplePrimitiveWebGpuComputeDisabledKey = null;
+    simulator.simplePrimitiveWebGpuComputeDisabledReason = null;
+  }
+  if (!nextEnabled) {
+    simulator.accelerationStats = {
+      backend: 'generic-js',
+      fallbackReasons: ['WebGPU/WASM disabled by setting']
+    };
+  } else if (simulator.accelerationStats?.fallbackReasons?.includes('WebGPU/WASM disabled by setting')) {
+    simulator.accelerationStats = null;
+  }
+
+  if (simulator.webGpuRayRenderer) {
+    simulator.webGpuRayRenderer.setVisible(false);
+  }
+
+  if (changed) {
+    simulator.updateSimulation(false, true, true);
+  }
+}
+
+function setBenchmarkMode(enabled) {
+  benchmarkRedrawEnabled = Boolean(enabled);
+  app.benchmarkMode = benchmarkRedrawEnabled;
+
+  if (!benchmarkRedrawEnabled) {
+    if (benchmarkRedrawFrameId !== null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(benchmarkRedrawFrameId);
+    }
+    benchmarkRedrawFrameId = null;
+    benchmarkRedrawLastFrameMs = null;
+    benchmarkRedrawVisualFrameMs = 0;
+    return;
+  }
+
+  scheduleBenchmarkRedraw();
+}
+
+function scheduleBenchmarkRedraw() {
+  if (
+    !benchmarkRedrawEnabled ||
+    benchmarkRedrawFrameId !== null ||
+    !simulator ||
+    typeof window === 'undefined' ||
+    typeof window.requestAnimationFrame !== 'function'
+  ) {
+    return;
+  }
+
+  benchmarkRedrawFrameId = window.requestAnimationFrame(runBenchmarkRedrawFrame);
+}
+
+function runBenchmarkRedrawFrame() {
+  benchmarkRedrawFrameId = null;
+  const frameNow = appNow();
+  if (benchmarkRedrawLastFrameMs !== null) {
+    benchmarkRedrawVisualFrameMs = frameNow - benchmarkRedrawLastFrameMs;
+  }
+  benchmarkRedrawLastFrameMs = frameNow;
+
+  if (!benchmarkRedrawEnabled || !simulator) {
+    return;
+  }
+
+  if (!benchmarkRedrawSimulationRunning && !benchmarkRedrawUpdateInProgress) {
+    benchmarkRedrawUpdateInProgress = true;
+    try {
+      simulator.updateSimulation(false, true, true);
+    } finally {
+      benchmarkRedrawUpdateInProgress = false;
+    }
+  }
+
+  scheduleBenchmarkRedraw();
+}
+
+function appNow() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
 
 function resetDropdownButtons() {
   // Remove the 'selected' class from all dropdown buttons
@@ -1011,34 +1263,39 @@ function updateErrorAndWarning() {
 }
 
 function openSample(name) {
-  var client = new XMLHttpRequest();
-  client.open('GET', '../gallery/' + name);
-  client.onload = function () {
-    if (client.status >= 300) {
-      error = "openSample: " + i18next.t('simulator:appErrors.httpStatusError', { status: client.status });
-      document.getElementById('welcome').style.display = 'none';
-      updateErrorAndWarning();
-      return;
-    }
-    scene.backgroundImage = null;
-    editor.loadJSON(client.responseText);
-
-    editor.onActionComplete();
-    hasUnsavedChange = false;
-    jsonEditorService.updateContent(editor.lastActionJson, null, true);
-  }
-  client.onerror = function () {
-    error = "openSample: " + i18next.t('simulator:appErrors.httpError');
-    document.getElementById('welcome').style.display = 'none';
-    updateErrorAndWarning();
-  }
-  client.ontimeout = function () {
-    error = "openSample: " + i18next.t('simulator:appErrors.httpTimeout');
-    document.getElementById('welcome').style.display = 'none';
-    updateErrorAndWarning();
+  const id = name.replace(/\.json$/i, '');
+  if (openGallerySample(id)) {
+    return;
   }
 
-  client.send();
+  error = "openSample: " + i18next.t('simulator:galleryModal.loadError', { id });
+  document.getElementById('welcome').style.display = 'none';
+  updateErrorAndWarning();
+}
+
+function openGallerySample(id) {
+  const sceneJSON = getGallerySceneJSON(id);
+  if (!sceneJSON) {
+    return false;
+  }
+
+  scene.backgroundImage = null;
+  editor.loadJSON(sceneJSON);
+  editor.onActionComplete();
+  hasUnsavedChange = false;
+  jsonEditorService.updateContent(editor.lastActionJson, null, true);
+  document.getElementById('welcome').style.display = 'none';
+  return true;
+}
+
+function showGalleryModal() {
+  const modal = document.getElementById('galleryModal');
+  if (modal) {
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+    return true;
+  }
+  window.dispatchEvent(new Event('rayOpticsOpenGallery'));
+  return false;
 }
 
 function mergeModulesFromMap(moduleMap) {
@@ -1416,6 +1673,10 @@ export const app = {
   rename,
   save,
   syncUrl,
+  openGallerySample,
+  showGalleryModal,
+  setUseWebGpuAndWasm,
+  setBenchmarkMode,
   setHasUnsavedChange,
   importModulesFromSceneFile,
   importShapes,

@@ -129,6 +129,7 @@ import InfoPopoverIcon from '../InfoPopoverIcon.vue'
 import SceneObjListItemContent from './SceneObjListItemContent.vue'
 import { useSceneStore } from '../../store/scene'
 import { app } from '../../services/app'
+import { appEvents } from '../../services/appEvents'
 import * as bootstrap from 'bootstrap'
 
 export default {
@@ -397,7 +398,7 @@ export default {
       selectedIds.value = []
       setEditorHighlights([])
       nextTick(() => {
-        document.dispatchEvent(new CustomEvent('selectVisualModuleTab', { detail: { moduleName } }))
+        appEvents.emitSelectVisualModuleTab({ moduleName })
       })
     }
 
@@ -466,9 +467,11 @@ export default {
       }
     }
 
+    let unsubscribeClearVisualEditorSelection = null
+
     onMounted(() => {
       document.addEventListener('sceneObjSelectionChanged', onEditorSelectionChange)
-      document.addEventListener('clearVisualEditorSelection', handleSceneTabClick)
+      unsubscribeClearVisualEditorSelection = appEvents.onClearVisualEditorSelection(handleSceneTabClick)
       document.addEventListener('sceneObjsChanged', onSceneObjsChanged)
       nextTick(() => {
         bindHandleDropdownToggleRef.value?.addEventListener('show.bs.dropdown', onSceneObjDropdownShow)
@@ -478,7 +481,7 @@ export default {
 
     onUnmounted(() => {
       document.removeEventListener('sceneObjSelectionChanged', onEditorSelectionChange)
-      document.removeEventListener('clearVisualEditorSelection', handleSceneTabClick)
+      unsubscribeClearVisualEditorSelection?.()
       document.removeEventListener('sceneObjsChanged', onSceneObjsChanged)
       bindHandleDropdownToggleRef.value?.removeEventListener('show.bs.dropdown', onSceneObjDropdownShow)
       moveModuleDropdownToggleRef.value?.removeEventListener('show.bs.dropdown', onSceneObjDropdownShow)
@@ -599,5 +602,4 @@ export default {
   color: rgba(255, 255, 255, 0.55);
 }
 </style>
-
 

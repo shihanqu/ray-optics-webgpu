@@ -269,17 +269,17 @@ for (const lang of langs) {
     "/simulator": "/simulator/" + (lang === 'en' ? '' : '?' + lang),
     "/phydemo": "https://phydemo.app/",
     "/email": "mailto:ray-optics@phydemo.app",
-    "/github": "https://github.com/ricktu288/ray-optics",
-    "/github/issues": "https://github.com/ricktu288/ray-optics/issues",
-    "/github/discussions": "https://github.com/ricktu288/ray-optics/discussions",
-    "/integrations": "https://github.com/ricktu288/ray-optics/tree/dist-integrations",
-    "/contributing": "https://github.com/ricktu288/ray-optics/blob/master/CONTRIBUTING.md",
-    "/contributing/gallery": "https://github.com/ricktu288/ray-optics/blob/master/CONTRIBUTING.md#contributing-items-to-the-gallery",
-    "/contributing/modules": "https://github.com/ricktu288/ray-optics/blob/master/CONTRIBUTING.md#contributing-modules",
-    "/license": "https://github.com/ricktu288/ray-optics/blob/master/LICENSE",
+    "/github": "https://github.com/shihanqu/ray-optics",
+    "/github/issues": "https://github.com/shihanqu/ray-optics/issues",
+    "/github/discussions": "https://github.com/shihanqu/ray-optics/discussions",
+    "/integrations": "https://github.com/shihanqu/ray-optics/tree/dist-integrations",
+    "/contributing": "https://github.com/shihanqu/ray-optics/blob/master/CONTRIBUTING.md",
+    "/contributing/gallery": "https://github.com/shihanqu/ray-optics/blob/master/CONTRIBUTING.md#contributing-items-to-the-gallery",
+    "/contributing/modules": "https://github.com/shihanqu/ray-optics/blob/master/CONTRIBUTING.md#contributing-modules",
+    "/license": "https://github.com/shihanqu/ray-optics/blob/master/LICENSE",
     "/mathjs/syntax": "https://mathjs.org/docs/expressions/syntax.html",
     "/ai-tools/chatgpt": "https://chatgpt.com/g/g-6777588b53708191b66722e353e95125-ray-optics-coder",
-    "/ai-tools/instructions": "https://github.com/ricktu288/ray-optics/blob/master/ai-tools"
+    "/ai-tools/instructions": "https://github.com/shihanqu/ray-optics/blob/master/ai-tools"
   };
 
   homeLangs.push(lang);

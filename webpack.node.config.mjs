@@ -17,8 +17,9 @@
 import path from 'path';
 
 export default (env, argv) => {
-  // Always use production mode for Node.js build
-  const isProduction = true;
+  const isFastBuild = Boolean(env?.fast);
+  // Release/integration builds stay production/minified; test and benchmark builds can skip minification.
+  const isProduction = !isFastBuild;
 
   return {
     entry: './src/core/index.js',
@@ -34,7 +35,7 @@ export default (env, argv) => {
     },
     optimization: {
       // Ensure a single output file
-      minimize: true,
+      minimize: isProduction,
       runtimeChunk: false,
       splitChunks: false
     },
@@ -62,6 +63,10 @@ export default (env, argv) => {
           generator: {
             filename: 'img/[name][ext]'
           }
+        },
+        {
+          test: /\.wasm$/i,
+          type: 'asset/inline'
         }
       ],
     },
@@ -71,6 +76,7 @@ export default (env, argv) => {
       type: 'filesystem'
     },
     mode: isProduction ? 'production' : 'development',
+    devtool: false,
     resolve: {
       alias: {
         mathjs: path.resolve('node_modules/mathjs'),

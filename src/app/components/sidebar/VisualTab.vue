@@ -80,6 +80,7 @@
 <script>
 import { computed, nextTick, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
 import { useSceneStore } from '../../store/scene'
+import { appEvents } from '../../services/appEvents'
 import { promptNewModuleName } from '../../utils/promptNewModuleName.js'
 import SceneObjsEditor from './SceneObjsEditor.vue'
 import ModuleEditor from './ModuleEditor.vue'
@@ -175,14 +176,12 @@ export default {
       applyNewModule(newName)
     }
 
-    const handleApplyVisualNewModule = (event) => {
-      const moduleName = event?.detail?.moduleName
+    const handleApplyVisualNewModule = ({ moduleName }) => {
       if (!moduleName) return
       applyNewModule(moduleName)
     }
 
-    const handleSelectModuleTab = (event) => {
-      const moduleName = event?.detail?.moduleName
+    const handleSelectModuleTab = ({ moduleName }) => {
       if (moduleName) {
         activeTabId.value = `module:${moduleName}`
       }
@@ -196,7 +195,7 @@ export default {
       if (event?.target?.closest?.('.sidebar-item-list') || event?.target?.closest?.('.scene-objs-editor-actions')) {
         return
       }
-      document.dispatchEvent(new CustomEvent('clearVisualEditorSelection'))
+      appEvents.emitClearVisualEditorSelection()
     }
 
     // If the selected module disappears, fall back to Scene.
@@ -208,16 +207,20 @@ export default {
       }
     })
 
+    let unsubscribeSelectVisualModuleTab = null
+    let unsubscribeSelectVisualSceneTab = null
+    let unsubscribeApplyVisualNewModule = null
+
     onMounted(() => {
-      document.addEventListener('selectVisualModuleTab', handleSelectModuleTab)
-      document.addEventListener('selectVisualSceneTab', handleSelectSceneTab)
-      document.addEventListener('applyVisualNewModule', handleApplyVisualNewModule)
+      unsubscribeSelectVisualModuleTab = appEvents.onSelectVisualModuleTab(handleSelectModuleTab)
+      unsubscribeSelectVisualSceneTab = appEvents.onSelectVisualSceneTab(handleSelectSceneTab)
+      unsubscribeApplyVisualNewModule = appEvents.onApplyVisualNewModule(handleApplyVisualNewModule)
     })
 
     onUnmounted(() => {
-      document.removeEventListener('selectVisualModuleTab', handleSelectModuleTab)
-      document.removeEventListener('selectVisualSceneTab', handleSelectSceneTab)
-      document.removeEventListener('applyVisualNewModule', handleApplyVisualNewModule)
+      unsubscribeSelectVisualModuleTab?.()
+      unsubscribeSelectVisualSceneTab?.()
+      unsubscribeApplyVisualNewModule?.()
     })
 
     return {
@@ -364,5 +367,4 @@ export default {
   color: #b8d9ff;
 }
 </style>
-
 

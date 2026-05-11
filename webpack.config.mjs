@@ -53,11 +53,19 @@ export default (env, argv) => {
           use: ['style-loader', 'css-loader'],
         },
         {
+          test: /data[\\/]galleryScenes[\\/].*\.png$/i,
+          type: 'asset/inline',
+        },
+        {
           test: /\.(png|jpe?g|gif|svg|eot|ttf|woff|woff2)$/i,
           type: 'asset/resource',
           generator: {
             filename: 'img/[name][ext]',
           },
+        },
+        {
+          test: /\.wasm$/i,
+          type: 'asset/inline',
         },
       ],
     },
@@ -65,6 +73,7 @@ export default (env, argv) => {
       new HtmlWebpackPlugin({
         template: './src/app/index.html',
         filename: 'simulator/index.html',
+        hash: true,
         templateContent: () => {
           const templateContent = fs.readFileSync('./src/app/index.html', 'utf-8');
           const localeData = buildInlineLocaleData();
