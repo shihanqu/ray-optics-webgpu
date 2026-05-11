@@ -164,6 +164,10 @@ export default {
       modal.addEventListener('show.bs.modal', () => { isModalOpen.value = true })
       modal.addEventListener('hide.bs.modal', () => { isModalOpen.value = false })
       window.addEventListener('rayOpticsOpenGallery', showGalleryModal)
+      if (window.rayOpticsOpenGalleryRequested) {
+        window.rayOpticsOpenGalleryRequested = false
+        showGalleryModal()
+      }
     })
 
     onUnmounted(() => {

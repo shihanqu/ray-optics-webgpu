@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Welcome to Ray Optics Simulation",
-    "instruction": "To add an optical component, select a tool and click the blank space.\nTo load a built-in demo, open the Demo Gallery from the File menu.",
+    "instruction": "To add an optical component, select a tool and click the blank space.\nTo load a built-in demo, [open the Demo Gallery](/gallery).",
     "loading": "Loading scene from URL… Please wait."
   },
   "common": {

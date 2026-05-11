@@ -79,12 +79,48 @@
         }
       }
 
+      function openWelcomeGalleryModal() {
+        var modal = document.getElementById('galleryModal');
+        if (modal && window.bootstrap && window.bootstrap.Modal) {
+          window.bootstrap.Modal.getOrCreateInstance(modal).show();
+        } else {
+          window.rayOpticsOpenGalleryRequested = true;
+          window.dispatchEvent(new Event('rayOpticsOpenGallery'));
+        }
+      }
+
+      function isGalleryUrl(url) {
+        try {
+          var parsedUrl = new URL(url, location.href);
+          var pathname = parsedUrl.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+          return parsedUrl.origin === location.origin && pathname.endsWith('/gallery');
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function renderWelcomeInstruction(text) {
+        return text
+          .replace(/\n/g, '<br>')
+          .replace(/\[([^\]]+)\]\((?:\.{0,2}\/)?gallery\/?\)/g, function (match, text) {
+            return `<button type="button" data-open-gallery-modal class="inline-link-button">${text}</button>`;
+          });
+      }
+
       var route = (localeData[lang].route !== undefined) ? localeData[lang].route : '/' + lang;
       document.getElementById("welcome_title").innerHTML = (localeData[lang].welcome && localeData[lang].welcome.title) || localeData.en.welcome.title;
-      document.getElementById("welcome_instruction").innerHTML = ((localeData[lang].welcome && localeData[lang].welcome.instruction) || localeData.en.welcome.instruction).replace('\n', '<br>').replace(/\[([^\]]+)\]\(\/gallery\)/g, function (match, text) {
-        return `<button type="button" data-bs-toggle="modal" data-bs-target="#galleryModal" class="inline-link-button" style="color: #1b77ff;">${text}</button>`;
-      });
+      document.getElementById("welcome_instruction").innerHTML = renderWelcomeInstruction((localeData[lang].welcome && localeData[lang].welcome.instruction) || localeData.en.welcome.instruction);
       document.getElementById("welcome_loading").innerHTML = (localeData[lang].welcome && localeData[lang].welcome.loading) || localeData.en.welcome.loading;
+      document.getElementById("welcome_instruction").addEventListener('click', function(event) {
+        var target = event.target.closest('[data-open-gallery-modal], a');
+        if (!target || !event.currentTarget.contains(target)) {
+          return;
+        }
+        if (target.hasAttribute('data-open-gallery-modal') || (target.tagName === 'A' && isGalleryUrl(target.getAttribute('href')))) {
+          event.preventDefault();
+          openWelcomeGalleryModal();
+        }
+      });
       
       if (location.hash) {
         document.getElementById("welcome_loading").style.display = '';
@@ -100,13 +136,23 @@
         100% { transform: rotate(360deg); }
       }
 
-      /* Match app link UX before the bundle loads (inline styles on the <a> cannot set hover). */
-      #welcome_instruction a {
+      /* Match app link UX before the bundle loads. */
+      #welcome_instruction a,
+      #welcome_instruction .inline-link-button {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #1b77ff;
+        cursor: pointer;
         text-decoration: none;
         text-underline-offset: 2px;
+        font: inherit;
       }
       #welcome_instruction a:hover,
-      #welcome_instruction a:focus-visible {
+      #welcome_instruction a:focus-visible,
+      #welcome_instruction .inline-link-button:hover,
+      #welcome_instruction .inline-link-button:focus-visible {
         text-decoration: underline;
       }
     </style>

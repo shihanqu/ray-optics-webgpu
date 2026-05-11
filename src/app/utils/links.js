@@ -45,7 +45,7 @@ export function mapURL(url) {
 export function parseLinks(text) {
   return text.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, function (match, text, url) {
     if (url === '/gallery') {
-      return `<button type="button" data-bs-toggle="modal" data-bs-target="#galleryModal" class="inline-link-button">${text}</button>`;
+      return `<button type="button" data-open-gallery-modal data-bs-toggle="modal" data-bs-target="#galleryModal" class="inline-link-button">${text}</button>`;
     }
     if (text === 'ray-optics@phydemo.app') {
       // Prevent link from wrapping.
