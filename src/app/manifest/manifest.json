@@ -3,11 +3,11 @@
   "short_name": "Ray Optics",
   "icons": [
     {
-      "src": "/ray-optics/img/icon.png",
+      "src": "/ray-optics-webgpu/img/icon.png",
       "sizes": "128x128"
     }
   ],
-  "start_url": "/ray-optics/simulator/index.html",
+  "start_url": "/ray-optics-webgpu/simulator/index.html",
   "display": "standalone",
   "theme_color": "white",
   "background_color": "black"

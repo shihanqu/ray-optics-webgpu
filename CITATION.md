@@ -4,7 +4,7 @@ If you use Ray Optics Simulation in your research, please cite it according to t
 
 ## The online version
 
-If you are using the [online version](https://phydemo.app/ray-optics/simulator/), please check if you are using any beta features (if some are used, a "Beta" icon is shown in the lower left corner of the web app). If no beta features are used, then please cite [the Zenodo record of the latest release](https://doi.org/10.5281/zenodo.6386611) by following the "Citation" or "Export" panel there. If beta features are used, you may either cite as above but with additional comment on the usage of beta features (as the latest release does not include beta features), or directly cite the GitHub repository with access date.
+If you are using the [online version](https://shihanqu.github.io/ray-optics-webgpu/simulator/), please check if you are using any beta features (if some are used, a "Beta" icon is shown in the lower left corner of the web app). If no beta features are used, then please cite [the Zenodo record of the latest upstream release](https://doi.org/10.5281/zenodo.6386611) by following the "Citation" or "Export" panel there, and note that this fork includes WebGPU/WASM acceleration and other modifications. If beta features or fork-specific features are used, directly cite this GitHub repository with access date.
 
 ## Other versions
 

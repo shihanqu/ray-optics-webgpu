@@ -1432,7 +1432,7 @@ function syncUrl() {
   }
   syncUrlTimerId = setTimeout(function () {
     var compressed = require('json-url')('lzma').compress(JSON.parse(editor.lastActionJson)).then(output => {
-      var fullURL = "https://phydemo.app/ray-optics/simulator/#" + output;
+      var fullURL = "https://shihanqu.github.io/ray-optics-webgpu/simulator/#" + output;
       if (fullURL.length > 2041) {
         warning = i18next.t('simulator:generalWarnings.autoSyncUrlTooLarge');
         updateErrorAndWarning();
@@ -1531,7 +1531,7 @@ function openFile(readFile) {
 
 function getLink() {
   require('json-url')('lzma').compress(JSON.parse(editor.lastActionJson)).then(output => {
-    var fullURL = "https://phydemo.app/ray-optics/simulator/#" + output;
+    var fullURL = "https://shihanqu.github.io/ray-optics-webgpu/simulator/#" + output;
     lastFullURL = fullURL;
     window.history.pushState(undefined, undefined, '#' + output);
     //console.log(fullURL.length);

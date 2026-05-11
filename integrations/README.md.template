@@ -11,7 +11,7 @@ This package contains tools for integrating the Ray Optics Simulation engine wit
 
 ## Contents
 
-- `rayOptics.js` - The core simulation engine ([source code](https://github.com/shihanqu/ray-optics-webgpu/blob/master/src/core), [documentation](https://phydemo.app/ray-optics/docs/index.html))
+- `rayOptics.js` - The core simulation engine ([source code](https://github.com/shihanqu/ray-optics-webgpu/blob/master/src/core), [documentation](https://github.com/shihanqu/ray-optics-webgpu/tree/master/src))
 - `runner.js` - Command-line interface for the simulation engine
 - `example_python.py` - Python example
 - `example_julia.jl` - Julia example

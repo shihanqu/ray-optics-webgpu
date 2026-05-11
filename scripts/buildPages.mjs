@@ -223,7 +223,7 @@ for (const id of moduleIDs) {
   moduleItemsLangs[id] = [];
 }
 
-const rootAbsUrl = "https://phydemo.app/ray-optics";
+const rootAbsUrl = "https://shihanqu.github.io/ray-optics-webgpu";
 const urlMaps = {};
 const langNames = {};
 const i18nextResources = {};

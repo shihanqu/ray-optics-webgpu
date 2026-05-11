@@ -19,7 +19,7 @@ You can submit your work to the Gallery. The scene should satisfy the following 
 **Method 1: By e-mail**
 
 1. Save you work as a `.json` file using the "Save" button (or use "Copy Shareable Link"). If your work contains a background image (which can be loaded with "Open"), it should be in a separate file.
-2. Send the files (or link) to ray-optics@phydemo.app with the subject "Gallery submission: [title of your work]". In the body of the email, include a description of your work (to show on the webpage), and your name to appear on the [list of contributors](https://phydemo.app/ray-optics/about).
+2. Send the files (or link) to ray-optics@phydemo.app with the subject "Gallery submission: [title of your work]". In the body of the email, include a description of your work (to show on the webpage), and your name to appear on the [list of contributors](https://github.com/shihanqu/ray-optics-webgpu/graphs/contributors).
 
 **Method 2: Via GitHub** (preferred if you use GitHub)
 
@@ -43,7 +43,7 @@ Contributed modules will be shown in the list in Tools -> Others -> Import Modul
 **Method 1: By e-mail**
 
 1. Save you scene with the new module as a `.json` file using the "Save" button.
-2. Send the files to ray-optics@phydemo.app with the subject "Module submission: [title of your module]". In the body of the email, include a description of your module, and your name to appear on the [list of contributors](https://phydemo.app/ray-optics/about).
+2. Send the files to ray-optics@phydemo.app with the subject "Module submission: [title of your module]". In the body of the email, include a description of your module, and your name to appear on the [list of contributors](https://github.com/shihanqu/ray-optics-webgpu/graphs/contributors).
 
 **Method 2: Via GitHub** (preferred if you use GitHub)
 

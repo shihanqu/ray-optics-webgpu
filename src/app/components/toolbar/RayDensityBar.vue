@@ -118,7 +118,8 @@ import { useSceneStore } from '../../store/scene'
 import { computed, toRef } from 'vue'
 
 const RAY_DENSITY_LOG_MIN = -3
-const RAY_DENSITY_LOG_MAX = 3 + Math.log(4)
+const RAY_DENSITY_MAX_MULTIPLIER = 4
+const RAY_DENSITY_LOG_MAX = 3 + Math.log(RAY_DENSITY_MAX_MULTIPLIER)
 const RAY_DENSITY_STEP = 0.0001
 const RAY_DENSITY_BUTTON_STEP = 0.1
 

@@ -1,10 +1,7 @@
 ![Example figure](https://raw.githubusercontent.com/shihanqu/ray-optics-webgpu/master/src/img/spherical-lens-and-mirror.jpg)
 
-# Ray Optics Simulation
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6386611.svg)](https://doi.org/10.5281/zenodo.6386611)
-[![translated](https://hosted.weblate.org/widget/ray-optics-simulation/svg-badge.svg)](https://hosted.weblate.org/engage/ray-optics-simulation/)
+# Ray Optics WebGPU
 [![Deploy website](https://github.com/shihanqu/ray-optics-webgpu/actions/workflows/deploy.yml/badge.svg)](https://github.com/shihanqu/ray-optics-webgpu/actions/workflows/deploy.yml)
-[![Deploy integrations](https://github.com/shihanqu/ray-optics-webgpu/actions/workflows/deploy-integrations.yml/badge.svg)](https://github.com/shihanqu/ray-optics-webgpu/actions/workflows/deploy-integrations.yml)
 
 A web app for creating and simulating 2D geometric optical scenes, with a gallery of (interactive) demos.
 
@@ -16,6 +13,7 @@ This fork is based on the original [ricktu288/ray-optics](https://github.com/ric
 - A benchmark mode that reports ray count, FPS, rays/ms, phase timings, backend selection, and fallback reasons.
 - A `Use WebGPU and WASM` setting that can switch between the accelerated path and the original CPU ray path.
 - An internal gallery picker for bundled demo scenes, without depending on an external gallery `index.html`.
+- A Ray Density slider whose maximum is 4x the original upstream upper limit, from `e^3` to `4e^3`.
 
 ## Features
 - Simulate various light sources: ray, parallel/divergent beam, and point source
@@ -33,23 +31,24 @@ This fork is based on the original [ricktu288/ray-optics](https://github.com/ric
 - View images that can be observed from some given position
 - Distance, angular, energy flow, and momentum flow measurements
 - Draw irradiance map and export as CSV data
+- Increased maximum Ray Density: the far-right slider position emits 4x as many rays as the original upstream maximum.
 - Import shapes from SVG files as optical components<sup>Beta</sup>
 - Export as SVG diagram
 - Create modularized combinations of optical elements with custom parameters.
 - Use the simulator as a node module in your own project and integrate with other programming languages.
 
 ## Links
-- [**Launch the Web App**](https://phydemo.app/ray-optics/simulator/)
-- [Gallery](https://phydemo.app/ray-optics/gallery/)
-- [Documentation](https://phydemo.app/ray-optics/docs/index.html)
-- [About](https://phydemo.app/ray-optics/about)
+- [**Launch the Web App**](https://shihanqu.github.io/ray-optics-webgpu/simulator/)
+- [Built-in Demo Gallery](https://shihanqu.github.io/ray-optics-webgpu/simulator/) - open the Demo Gallery inside the app.
+- [Source documentation](https://github.com/shihanqu/ray-optics-webgpu/tree/master/src)
+- [About this fork](https://github.com/shihanqu/ray-optics-webgpu#about-this-fork)
 - [Run Locally](https://github.com/shihanqu/ray-optics-webgpu/blob/master/run-locally/README.md)
 
 ## Cite this project
 
 If you use this project in your research, please cite it according to the following instruction depending on the version you are using.
 
-If you are using the [online version](https://phydemo.app/ray-optics/simulator/), please check if you are using any beta features (if some are used, a "Beta" icon is shown in the lower left corner of the web app). If no beta features are used, then please cite [the Zenodo record of the latest release](https://doi.org/10.5281/zenodo.6386611) by following the "Citation" or "Export" panel there. If beta features are used, you may either cite as above but with additional comment on the usage of beta features (as the latest release does not include beta features), or directly cite the GitHub repository with access date.
+If you are using the [online version](https://shihanqu.github.io/ray-optics-webgpu/simulator/), please check if you are using any beta features (if some are used, a "Beta" icon is shown in the lower left corner of the web app). If no beta features are used, then please cite [the Zenodo record of the latest upstream release](https://doi.org/10.5281/zenodo.6386611) by following the "Citation" or "Export" panel there, and note that this fork includes WebGPU/WASM acceleration and other modifications. If beta features or fork-specific features are used, directly cite this GitHub repository with access date.
 
 If you are running the project locally, please follow the Zenodo link of the version you are using in the [Releases](https://github.com/shihanqu/ray-optics-webgpu/releases) page if you downloaded it there. If you are not using a released version (e.g. downloaded from a previous "latest deployment" link or cloned from the repository), you may either cite the Zenodo record corresponding to the most recent parent release of the version you are using with comment on the usage of beta/modified features (if any), or directly cite the GitHub repository with access date.
 
@@ -57,7 +56,7 @@ If you are running the project locally, please follow the Zenodo link of the ver
 
 Contributions are welcome. For the following types of contributions, no (or little) programming knowledge is required:
 
-- New items in the [gallery](https://phydemo.app/ray-optics/gallery/)
+- New items in the built-in demo gallery
 - New translations
 - New modules (as in Tools -> Other -> Import Modules)
 
@@ -67,18 +66,18 @@ For translations, note that this project uses Weblate. Please visit https://host
 
 [![Translation status](https://hosted.weblate.org/widget/ray-optics-simulation/287x66-grey.png)](https://hosted.weblate.org/engage/ray-optics-simulation/)
 
-To contribute code, you need to have some knowledge of JavaScript and module bundling. The code is written in ES6 and bundled with Webpack. The code structure is documented in the [documentation](https://phydemo.app/ray-optics/docs/index.html). See the following section for installation instructions.
+To contribute code, you need to have some knowledge of JavaScript and module bundling. The code is written in ES6 and bundled with Webpack. See [src/README.md](https://github.com/shihanqu/ray-optics-webgpu/blob/master/src/README.md) for the source layout and the following section for installation instructions.
 
 ## Installation
 
 > [!NOTE]
-> The following instructions are for developers. If you just want to use the web app, you can launch it directly from [here](https://phydemo.app/ray-optics/simulator/).
+> The following instructions are for developers. If you just want to use the web app, you can launch it directly from [here](https://shihanqu.github.io/ray-optics-webgpu/simulator/).
 > If you just want to run the project locally, please see [Run Locally](https://github.com/shihanqu/ray-optics-webgpu/blob/master/run-locally/README.md).
 
 To run the web app locally for development, you need to have Node.js installed. Then, run the following commands in the terminal:
 ```bash
 git clone https://github.com/shihanqu/ray-optics-webgpu.git
-cd ray-optics
+cd ray-optics-webgpu
 npm install --no-optional
 npm run start
 ```
@@ -89,7 +88,7 @@ If you want to build the entire project, including the home pages, gallery, modu
 npm install
 npm run build
 ```
-After that, the entire content for the [https://phydemo.app/ray-optics/](https://phydemo.app/ray-optics/) website will be in the `dist` folder. You can again run `npm run start` to run the simulator locally, and now all the links and the "import module" window should work.
+After that, the static site content for GitHub Pages will be in the `dist` folder. You can again run `npm run start` to run the simulator locally, and now all the links and the "import module" window should work.
 
 If an error occurs during the installation, some common reasons are:
 - The version of Node.js is too old. You can update Node.js to version 18 or later.
@@ -105,7 +104,7 @@ The full build may takes about half an hour to complete due to the generation of
 - `scripts` contains the scripts for custom build steps.
 - `test` contains the automatic tests for the project.
 - `integrations` contains the integration tools for the simulator with other programming languages.
-- `dist` (generated at build time) contains the built files for the project (the entire content for the [https://phydemo.app/ray-optics](https://phydemo.app/ray-optics) website).
+- `dist` (generated at build time) contains the built files for the project and the GitHub Pages deployment.
 - `dist-node` (generated at build time) contains the built files for the node module version of the simulator, which is required for the image generation, and can also be used in your own project.
 - `dist-integrations` (generated at build time) contains the built files for the integration tools.
 
@@ -175,7 +174,7 @@ After that, you can use the simulator in your own project by importing the modul
 const { Scene, Simulator, sceneObjs, geometry } = require('path/to/ray-optics/dist-node/rayOptics.js');
 ```
 
-See the [documentation](https://phydemo.app/ray-optics/docs/index.html) for more information about the API. For a usage example, see the [image generation script](https://github.com/shihanqu/ray-optics-webgpu/blob/master/scripts/buildImages.mjs).
+See the source documentation in this repository for more information about the API. For a usage example, see the [image generation script](https://github.com/shihanqu/ray-optics-webgpu/blob/master/scripts/buildImages.mjs).
 
 To build the integration tools by yourself, run the following command:
 ```bash

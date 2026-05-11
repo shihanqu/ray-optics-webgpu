@@ -7,4 +7,4 @@ This directory contains the source code for the simulator app, which is to be bu
 
 - `src/app/components` contains the Vue components for the simulator app.
 
-See the [documentation](https://phydemo.app/ray-optics/docs/index.html) for more information. The documentation is generated from the jsdoc comments in the code.
+See the [documentation](https://github.com/shihanqu/ray-optics-webgpu/tree/master/src) for more information. The documentation is generated from the jsdoc comments in the code.
