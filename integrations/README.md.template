@@ -6,12 +6,12 @@ This package contains tools for integrating the Ray Optics Simulation engine wit
 
 ## Download/Update
 
-- [Latest deployment](https://github.com/shihanqu/ray-optics/archive/refs/heads/dist-integrations.zip) (compatible with the online app)
-- [Latest release](https://github.com/shihanqu/ray-optics/releases/latest) (slightly older, no beta features, citable with a DOI)
+- [Latest deployment](https://github.com/shihanqu/ray-optics-webgpu/archive/refs/heads/dist-integrations.zip) (compatible with the online app)
+- [Latest release](https://github.com/shihanqu/ray-optics-webgpu/releases/latest) (slightly older, no beta features, citable with a DOI)
 
 ## Contents
 
-- `rayOptics.js` - The core simulation engine ([source code](https://github.com/shihanqu/ray-optics/blob/master/src/core), [documentation](https://phydemo.app/ray-optics/docs/index.html))
+- `rayOptics.js` - The core simulation engine ([source code](https://github.com/shihanqu/ray-optics-webgpu/blob/master/src/core), [documentation](https://phydemo.app/ray-optics/docs/index.html))
 - `runner.js` - Command-line interface for the simulation engine
 - `example_python.py` - Python example
 - `example_julia.jl` - Julia example
@@ -75,7 +75,7 @@ The [Ray Optics Coder](https://chatgpt.com/g/g-6777588b53708191b66722e353e95125-
 
 ## Cite this package
 
-Please follow the Zenodo link of the version you are using in the [Releases](https://github.com/shihanqu/ray-optics/releases) page if you downloaded this package there. If you are not using a released version (e.g. downloaded from a previous "latest deployment" link or cloned from the repository), you may either cite the Zenodo record corresponding to the most recent parent release of the version you are using with comment on the usage of beta/modified features (if any), or directly cite the GitHub repository with access date.
+Please follow the Zenodo link of the version you are using in the [Releases](https://github.com/shihanqu/ray-optics-webgpu/releases) page if you downloaded this package there. If you are not using a released version (e.g. downloaded from a previous "latest deployment" link or cloned from the repository), you may either cite the Zenodo record corresponding to the most recent parent release of the version you are using with comment on the usage of beta/modified features (if any), or directly cite the GitHub repository with access date.
 
 ## License
 

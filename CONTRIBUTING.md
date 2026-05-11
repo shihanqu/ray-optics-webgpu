@@ -2,7 +2,7 @@
 
 Contributions are welcome.
 
-To report bugs, request new features, or share your ideas, feel free to open [issues](https://github.com/shihanqu/ray-optics/issues) or [discussion](https://github.com/shihanqu/ray-optics/discussions).  You can also send an email to ray-optics@phydemo.app if you are not familiar with GitHub.
+To report bugs, request new features, or share your ideas, feel free to open [issues](https://github.com/shihanqu/ray-optics-webgpu/issues) or [discussion](https://github.com/shihanqu/ray-optics-webgpu/discussions).  You can also send an email to ray-optics@phydemo.app if you are not familiar with GitHub.
 
 For direct contributions, see the following guidelines.
 
@@ -56,7 +56,7 @@ Contributed modules will be shown in the list in Tools -> Others -> Import Modul
 
 Such as creating a new tool, adding a new parameter to a tool, adding a new mode of viewing light, etc. For significant changes such as a new framework or a new toolbar design, please open a new discussion first.
 
-See the [installation instructions](https://github.com/shihanqu/ray-optics/blob/master/README.md#installation) for how to set up the project locally.
+See the [installation instructions](https://github.com/shihanqu/ray-optics-webgpu/blob/master/README.md#installation) for how to set up the project locally.
 
 ### Requirements on compatibility
 
