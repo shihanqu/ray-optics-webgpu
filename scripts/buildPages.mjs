@@ -77,32 +77,32 @@ const logEntries = await git.raw([
 ]);
 
 const firstEntryHash = logEntries.split('\n')[0].split('|')[0];
+const hasCompleteGitHistory = firstEntryHash === 'c3b4eea281d34fc2aee5186510cceb50cd9db2f5';
 
-if (firstEntryHash !== 'c3b4eea281d34fc2aee5186510cceb50cd9db2f5') {
-  console.log('The repo is not completely cloned. Cannot generate contributors list.');
-  process.exit(1);
+if (!hasCompleteGitHistory) {
+  console.warn('Git history is incomplete. Contributor commit counts will be omitted.');
+} else {
+  // Process git log entries
+  logEntries.split('\n').forEach(entry => {
+    const [hash, name, email, date, message, parents] = entry.split('|');
+
+    if (!name || !email || !date) {
+      console.warn('Skipping invalid log entry:', entry);
+      return;
+    }
+
+    // Rule out merge commits
+    const parentCount = parents.split(' ').filter(Boolean).length;
+    if (parentCount > 1) {
+      return;
+    }
+
+    const contributor = contributors.find(c => (c.githubEmails || []).includes(email));
+    if (contributor) {
+      contributor.commits += 1;
+    }
+  });
 }
-
-// Process git log entries
-logEntries.split('\n').forEach(entry => {
-  const [hash, name, email, date, message, parents] = entry.split('|');
-
-  if (!name || !email || !date) {
-    console.warn('Skipping invalid log entry:', entry);
-    return;
-  }
-
-  // Rule out merge commits
-  const parentCount = parents.split(' ').filter(Boolean).length;
-  if (parentCount > 1) {
-    return;
-  }
-
-  const contributor = contributors.find(c => (c.githubEmails || []).includes(email));
-  if (contributor) {
-    contributor.commits += 1;
-  }
-});
 
 // Sort contributors by commit count
 const sortedContributors = contributors
